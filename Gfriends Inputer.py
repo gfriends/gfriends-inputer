@@ -2,7 +2,7 @@
 # Gfriends Inputer / 女友头像仓库导入工具
 # Licensed under the MIT license.
 # Designed by xinxin8816, many thanks for junerain123, ddd354, moyy996.
-version = 'v2.92'
+version = 'v2.93'
 
 import requests, os, io, sys, time, re, threading, argparse
 from alive_progress import alive_bar
@@ -68,7 +68,7 @@ def fix_size(type,path):
 
 def get_gfriends_map(repository_url):
 	rewriteable_word('>> 连接 Gfriends 女友头像仓库...')
-	if repository_url == '默认/': repository_url = 'https://raw.githubusercontent.com/xinxin8816/gfriends/master/'
+	if repository_url == '默认/': repository_url = 'https://raw.githubusercontent.com/gfriends/gfriends/master/'
 	gfriends_template = repository_url + '{}/{}/{}'
 	filetree_url = repository_url + 'Filetree.json'
 	try:
@@ -289,7 +289,7 @@ MAX_DL = 5
 MAX_Retry = 3
 
 ### 女友头像仓库源 ###
-# "默认"使用官方主仓库（已禁止浏览器访问）：https://raw.githubusercontent.com/xinxin8816/gfriends/master/
+# "默认"使用官方主仓库（已禁止浏览器访问）：https://raw.githubusercontent.com/gfriends/gfriends/master/
 # 获取更多官方备用镜像，详见项目首页
 Repository_Url = 默认
 
@@ -460,9 +460,9 @@ def check_update():
 		get_ip_thread = threading.Thread(target = get_ip)
 		get_ip_thread.start()
 		if Proxy_Range == 'NO':
-			response = session.get('https://api.github.com/repos/xinxin8816/gfriends/releases', timeout = 3)
+			response = session.get('https://api.github.com/repos/gfriends/gfriends-inputer/releases', timeout = 3)
 		else:
-			response = session.get('https://api.github.com/repos/xinxin8816/gfriends/releases', proxies = proxies, timeout = 3)
+			response = session.get('https://api.github.com/repos/gfriends/gfriends-inputer/releases', proxies = proxies, timeout = 3)
 		response.encoding = 'utf-8'
 		if response.status_code != 200:
 			print('× 检查更新失败！返回了一个错误： {}\n'.format(response.status_code))
