@@ -1,5 +1,5 @@
-# Gfriends Inputer
-适用于 Emby/Jellyfin 的媒体服务器头像导入工具。
+# Gfriends Inputer 一键导入工具
+适用于 Emby/Jellyfin 的媒体服务器头像导入工具，[Gfriends 女友头像仓库](https://github.com/gfriends/gfriends) 衍生项目。
 > *There is no correlation between this repo and Korean girl group GFRIEND.*
 
 ## 目录
@@ -13,8 +13,7 @@
 
 ## 快速开始
 #### 1. 下载并解压
-请在 [Release](https://github.com/gfriends/gfriends-inputer/releases) 下载并解压 Gfriends Inputer 压缩包
-
+请在 [Release](https://github.com/gfriends/gfriends-inputer/releases) 下载并解压 Gfriends Inputer 程序压缩包。<br>
 *提示：程序可以连接**远程**媒体服务器，因此请选择自己顺手的系统。*
 
 #### 2. 获取媒体服务器 API 密钥
@@ -26,7 +25,7 @@
 
 程序首次运行将自动生成配置文件 `Config.ini`，配置文件的必填项为 `媒体服务器的地址` 和获取的 `API 密钥`。
 
-*提示：v2.xx 旧版本的 Mac/Linux 配置文件在用户根目录，常见在：`/Users/username/`、`/home/username/`、`/root/`*
+*提示：v2.x 旧版本的 Mac/Linux 配置文件在用户根目录，常见在：`/Users/username/`、`/home/username/`、`/root/`*
 
 ```
 命令: "Gfriends Inputer" [-h] [-c [CONFIG]] [-q] [-v]
@@ -39,21 +38,28 @@
   -v, --version         显示当前版本。
 ```
 
+您亦可在 Python 3.6 及以上版本环境下直接运行源码
+```
+git clone https://github.com/gfriends/gfriends-inputer.git
+cd ./gfriends-inputer
+pip install -r requirements.txt
+python "./Gfriends Inputer.py"
+```
 
 ## 进阶说明
 
-按需配置进阶说明有助于提升使用体验。
+按需完成进阶配置有助于提升使用体验。
 
 ### 【精准裁剪头像】
 
 仓库中的头像可能尺寸不标准，媒体服务器会自动拉伸使头像变形，这时需要裁剪头像。虽很少遇到这种情况，但为避免裁剪到演员面部，您应当配置 AI 精准裁剪。
 
-#### 1. Pigo AI
+**1. Pigo AI**<br>
 *Gfriends Inputer v3.0 及后续版本支持*
 
 [Pigo](https://github.com/esimov/pigo) 提供无感知的人脸识别。准确度偏低，但速度极快且无需联网。仅需在配置文件中开启。
 
-#### 2. 百度 AI
+**2. 百度 AI**<br>
 *Gfriends Inputer v2.7 及后续版本支持*
 
 > *此服务需使用中国大陆居民身份证进行实名认证、并理解同意百度智能云的 [服务协议](https://cloud.baidu.com/doc/Agreements/s/yjwvy1x03) 、[隐私政策](https://cloud.baidu.com/doc/Agreements/s/Kjwvy245m) 以及百度AI开放平台的 [服务协议](https://ai.baidu.com/ai-doc/REFERENCE/kk3dwjg7d)。*
@@ -73,13 +79,13 @@
 在仓库中，可能收录了多张不同来源的同一女友头像。这时，默认根据头像质量及尺寸，自动选优后导入头像。<br>
 但是，每个人的喜好不同。比如，有的人可能不喜欢 Graphis 的头像，因为上面有标记女友名。有些人可能不喜欢 EBODY 的头像，因为女友衣着太暴露了。
 
-#### 1. 手动选择头像
+**1. 手动选择头像**<br>
 *Gfriends Inputer v3.0 及后续版本支持，仅 Windows*
 
 程序在遇到多头像时，自动弹窗罗列所有头像，您只需点击即可选择对应的头像。
 
-#### 2. 厂牌黑名单
-*Gfriends Inputer v2.xx 支持*
+**2. 厂牌黑名单**<br>
+*Gfriends Inputer v2.x 支持*
 
 编辑配置文件的 `厂牌黑名单`，填入厂牌后，相应的头像将不会被获取。具体厂牌名可以在主仓库 [图片来源](https://github.com/gfriends/gfriends#%E5%9B%BE%E7%89%87%E6%9D%A5%E6%BA%90) 或 [`Content`](https://github.com/gfriends/gfriends/tree/master/Content) 目录获取。
 
@@ -99,7 +105,7 @@
 
 *您知道其他相似的开源工具？欢迎提交 issues 告诉我。*
 
-# 许可证及法律信息
+## 许可证及法律信息
 本项目授权在 [MIT](https://github.com/gfriends/gfriends-inputer/blob/main/LICENSE) 许可下，此外：
 
 1. 项目仅用于技术、学术交流，严禁用于商业和其他盈利目的。
