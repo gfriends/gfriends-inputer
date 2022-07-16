@@ -97,17 +97,13 @@ def get_gfriends_map(repository_url):
     else:
         map_json = loads(response.text.replace('AI-Fix-', ''))
     output = {}
-    first_lvls = map_json.keys()
-    for first in first_lvls:
-        if 'first' != 'Content': continue
-        second_lvls = map_json[first].keys()
-        for second in second_lvls:
-            for k, v in map_json[first][second].items():
-                secondstr = re.sub(".*-", "", second)
-                if not secondstr in Black_List:
-                    output[k[:-4]] = gfriends_template.format(first, second, v)
+    for second in map_json['Content'].keys():
+        for k, v in map_json['Content'][second].items():
+            secondstr = re.sub(".*-", "", second)
+            if not secondstr in Black_List:
+                output[k[:-4]] = gfriends_template.format('Content', second, v)
     print('√ 连接 Gfriends 女友头像仓库成功')
-    print('   库存头像：' + str(response.text.count('\n')) + '枚\n')
+    print('   库存头像：' + str(map_json['Information']['TotalNum']) + '枚\n')
     return output
 
 
