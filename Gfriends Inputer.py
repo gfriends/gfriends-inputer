@@ -722,9 +722,11 @@ try:
         print('\n√ 没有需要下载的头像')
     else:
         print('\n>> 下载头像...')
-        if quiet_flag:
+        with alive_bar(len(link_dict), enrich_print=False, dual_line=True) as bar:
             for actor_name, link in link_dict.items():
                 try:
+                    bar.text('正在下载：'+re.sub(r'（.*）', '', actor_name)) if '（' in actor_name else bar.text('正在下载：'+actor_name)
+                    bar()
                     proc_md5 = md5((actor_name + '+1').encode('UTF-8')).hexdigest()[13:-13]
                     if not proc_flag or (proc_flag and not proc_md5 in proc_list):
                         download_avatar(link, actor_name, proc_md5)  # 记录下载完成的操作放到子线程中，以防没下完中断的断点没记录到
@@ -738,36 +740,14 @@ try:
                 except (KeyboardInterrupt):
                     sys.exit()
                 except:
-                    if debug: print(format_exc())
-                    print('× 网络连接异常，跳过下载：' + str(actor_name) + '\n')
+                    with bar.pause():
+                        if debug: print(format_exc())
+                        print('× 网络连接异常且重试 ' + str(max_retries) + ' 次失败')
+                        print('× 请尝试开启全局代理或配置 HTTP 局部代理；若已开启代理，请检查其可用性')
+                        print('× 按任意键继续运行则跳过下载这些头像：' + str(actor_name) + '\n')
+                        os.system('pause>nul') if WINOS else input()
                     continue
-        else:
-            with alive_bar(len(link_dict), enrich_print=False, dual_line=True) as bar:
-                for actor_name, link in link_dict.items():
-                    try:
-                        bar.text('正在下载：'+re.sub(r'（.*）', '', actor_name)) if '（' in actor_name else bar.text('正在下载：'+actor_name)
-                        bar()
-                        proc_md5 = md5((actor_name + '+1').encode('UTF-8')).hexdigest()[13:-13]
-                        if not proc_flag or (proc_flag and not proc_md5 in proc_list):
-                            download_avatar(link, actor_name, proc_md5)  # 记录下载完成的操作放到子线程中，以防没下完中断的断点没记录到
-                        else:
-                            proc_log.write(proc_md5 + '\n')
-                        while True:
-                            if threading.activeCount() > max_download_connect + 1:
-                                time.sleep(0.01)
-                            else:
-                                break
-                    except (KeyboardInterrupt):
-                        sys.exit()
-                    except:
-                        with bar.pause():
-                            if debug: print(format_exc())
-                            print('× 网络连接异常且重试 ' + str(max_retries) + ' 次失败')
-                            print('× 请尝试开启全局代理或配置 HTTP 局部代理；若已开启代理，请检查其可用性')
-                            print('× 按任意键继续运行则跳过下载这些头像：' + str(actor_name) + '\n')
-                            os.system('pause>nul') if WINOS else input()
-                        continue
-            rewriteable_word('>> 即将完成')
+        rewriteable_word('>> 即将完成')
         for thr_status in threading.enumerate():  # 等待子线程运行结束
             try:
                 thr_status.join()
@@ -810,29 +790,24 @@ try:
 
     if fixsize != '0':
         print('\n>> 尺寸优化...')
-        if quiet_flag:
+        with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
             for filename, pic_path in pic_path_dict.items():
+                bar.text('正在优化：'+re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text('正在优化：'+
+                    filename.replace('.jpg', ''))
+                bar()
                 proc_md5 = md5((filename + '+2').encode('UTF-8')).hexdigest()[13:-13]
                 if not proc_flag or (proc_flag and not proc_md5 in proc_list):
                     result = fix_size(fixsize, pic_path)
                     if not result: pic_path_dict.pop(filename)
                 proc_log.write(proc_md5 + '\n')
-        else:
-            with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
-                for filename, pic_path in pic_path_dict.items():
-                    bar.text('正在优化：'+re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text('正在优化：'+
-                        filename.replace('.jpg', ''))
-                    bar()
-                    proc_md5 = md5((filename + '+2').encode('UTF-8')).hexdigest()[13:-13]
-                    if not proc_flag or (proc_flag and not proc_md5 in proc_list):
-                        result = fix_size(fixsize, pic_path)
-                        if not result: pic_path_dict.pop(filename)
-                    proc_log.write(proc_md5 + '\n')
         print('√ 优化完成')
 
     print('\n>> 导入头像...')
-    if quiet_flag:
+    with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
         for filename, pic_path in pic_path_dict.items():
+            bar.text('正在导入：'+re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text('正在导入：'+
+                filename.replace('.jpg', ''))
+            bar()
             proc_md5 = md5((filename + '+3').encode('UTF-8')).hexdigest()[13:-13]
             if not proc_flag or (proc_flag and not proc_md5 in proc_list):
                 with open(pic_path, 'rb') as pic_bit:
@@ -851,31 +826,7 @@ try:
                 else:
                     break
             num_suc += 1
-    else:
-        with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
-            for filename, pic_path in pic_path_dict.items():
-                bar.text('正在导入：'+re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text('正在导入：'+
-                    filename.replace('.jpg', ''))
-                bar()
-                proc_md5 = md5((filename + '+3').encode('UTF-8')).hexdigest()[13:-13]
-                if not proc_flag or (proc_flag and not proc_md5 in proc_list):
-                    with open(pic_path, 'rb') as pic_bit:
-                        b6_pic = b64encode(pic_bit.read())
-                    if emby_flag:
-                        url_post_img = host_url + 'emby/Items/' + actor_dict[
-                            filename.replace('.jpg', '')] + '/Images/Primary?api_key=' + api_key
-                    else:
-                        url_post_img = host_url + 'jellyfin/Items/' + actor_dict[
-                            filename.replace('.jpg', '')] + '/Images/Primary?api_key=' + api_key
-                    input_avatar(url_post_img, b6_pic)
-                proc_log.write(proc_md5 + '\n')
-                while True:
-                    if threading.activeCount() > max_upload_connect + 1:
-                        time.sleep(0.01)
-                    else:
-                        break
-                num_suc += 1
-        rewriteable_word('>> 即将完成')
+    rewriteable_word('>> 即将完成')
     for thr_status in threading.enumerate():  # 等待子线程运行结束
         try:
             thr_status.join()
