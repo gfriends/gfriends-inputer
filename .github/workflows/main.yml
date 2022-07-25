@@ -33,8 +33,8 @@ jobs:
       run: |
         pyinstaller -F 'Gfriends Inputer.py' --collect-all grapheme
 
-   - name: Copy library
-        run: |
+    - name: Copy library
+      run: |
           cp ./Lib/opencv_face_detector_uint8.pb ./dist/Lib/opencv_face_detector_uint8.pb
           cp ./Lib/opencv_face_detector.pbtxt ./dist/Lib/opencv_face_detector.pbtxt
 
