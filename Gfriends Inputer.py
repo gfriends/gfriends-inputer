@@ -83,10 +83,7 @@ def get_gfriends_map(repository_url):
     keep_tree = False
     if os.path.exists('./Getter/Filetree.json'):
         # 加 deflate 请求以防压缩无法获取真实大小
-        if Proxy_Range in ['NO', 'HOST']:
-            gfriends_response = session.head(filetree_url, timeout=1, headers={'Accept-Encoding':'deflate'})
-        else:
-            gfriends_response = session.head(filetree_url, proxies=proxies, timeout=1, headers={'Accept-Encoding':'deflate'})
+        gfriends_response = session.head(filetree_url, proxies=proxies, timeout=1, headers={'Accept-Encoding':'deflate'})
         if os.path.getsize('./Getter/Filetree.json') == int(gfriends_response.headers['Content-Length']):
             keep_tree = True
 
@@ -99,10 +96,7 @@ def get_gfriends_map(repository_url):
         print('√ 使用 Gfriends 女友头像仓库缓存')
     else:
         try:
-            if Proxy_Range in ['NO', 'HOST']:
-                response = session.get(filetree_url, timeout=15)
-            else:
-                response = session.get(filetree_url, proxies=proxies, timeout=15)
+            response = session.get(filetree_url, proxies=proxies, timeout=15)
             # 修复部分服务端返回 header 未指明编码使后续解析错误
             response.encoding = 'utf-8'
         except requests.exceptions.RequestException:
@@ -155,10 +149,7 @@ def check_avatar(url, actor_name, proc_md5):
         if actor_name in exist_list:  # 没有头像的演员跳过检测
             actor_md5 = md5(actor_name.encode('UTF-8')).hexdigest()[12:-12]
             if actor_md5 in inputed_dict:  # 没有下载过的演员跳过检测
-                if Proxy_Range in ['NO', 'HOST']:
-                    gfriends_response = session.head(url, timeout=1)
-                else:
-                    gfriends_response = session.head(url, proxies=proxies, timeout=1)
+                gfriends_response = session.head(url, proxies=proxies, timeout=1)
                 if inputed_dict[actor_md5] == gfriends_response.headers['Content-Length']:
                     del link_dict[actor_name]
         # else:
@@ -166,7 +157,7 @@ def check_avatar(url, actor_name, proc_md5):
         # else: # 有头像的演员先不保存日志，避免二次请求
         # inputed_dict[actor_md5] = gfriends_response.headers['Content-Length']
         proc_log.write(proc_md5 + '\n')
-    except (requests.exceptions.ConnectTimeout):
+    except requests.exceptions.ConnectTimeout:
         print('!! ' + actor_name + ' 头像更新检查超时，可能是网络不稳定。')
     except:
         print('!! ' + actor_name + ' 头像更新检查失败。')
@@ -174,10 +165,7 @@ def check_avatar(url, actor_name, proc_md5):
 
 @asyncc
 def download_avatar(url, actor_name, proc_md5):
-    if Proxy_Range in ['NO', 'HOST']:
-        gfriends_response = session.get(url)
-    else:
-        gfriends_response = session.get(url, proxies=proxies)
+    gfriends_response = session.get(url, proxies=proxies)
     pic_path = download_path + actor_name + ".jpg"
     if gfriends_response.status_code == 429:
         print('!! ' + pic_path + ' 下载失败，女友仓库返回：429 请求过快，请稍后再试')
@@ -196,11 +184,7 @@ def download_avatar(url, actor_name, proc_md5):
 @asyncc
 def input_avatar(url, data):
     try:
-        if Proxy_Range in ['NO', 'REPO']:
-            session.post(url, data=data, headers={"Content-Type": 'image/jpeg',
-                                                  "User-Agent": 'Gfriends_Inputer/' + version.replace('v', '')})
-        else:
-            session.post(url, data=data, headers={"Content-Type": 'image/jpeg',
+        session.post(url, data=data, headers={"Content-Type": 'image/jpeg',
                                                   "User-Agent": 'Gfriends_Inputer/' + version.replace('v', '')},
                          proxies=proxies)
     except:
@@ -209,10 +193,7 @@ def input_avatar(url, data):
 
 @asyncc
 def del_avatar(url_post_img):
-    if Proxy_Range in ['NO', 'REPO']:
-        session.delete(url=url_post_img)
-    else:
-        session.delete(url=url_post_img, proxies=proxies)
+    session.delete(url=url_post_img, proxies=proxies)
 
 
 def get_gfriends_link(name):
@@ -245,8 +226,7 @@ def read_config(config_file):
             api_key = config_settings.get("媒体服务器", "Host_API")
             max_download_connect = config_settings.getint("下载设置", "MAX_DL")
             max_retries = config_settings.getint("下载设置", "MAX_Retry")
-            Proxy_Range = config_settings.get("下载设置", "Proxy_Range")
-            Proxy_Link = config_settings.get("下载设置", "Proxy_Link")
+            Proxy = config_settings.get("下载设置", "Proxy")
             download_path = config_settings.get("下载设置", "Download_Path")
             Black_List = config_settings.get("下载设置", "Black_List")
             max_upload_connect = config_settings.getint("导入设置", "MAX_UL")
@@ -260,6 +240,8 @@ def read_config(config_file):
             debug = True if config_settings.get("调试功能", "DeBug") == '是' else False
             deleteall = True if config_settings.get("调试功能", "DEL_ALL") == '是' else False
             fixsize = config_settings.get("导入设置", "Size_Fix")
+            '''
+            # 弃用代理选项
             if Proxy_Range not in ['ALL', 'REPO', 'HOST', 'NO']:
                 print('!! 局部代理范围 Proxy_Range 填写错误，自动关闭局部代理')
                 Proxy_Range = 'NO'
@@ -272,7 +254,7 @@ def read_config(config_file):
                     print('>> 媒体服务器位于局域网或本地，自动关闭局部代理')
                     Proxy_Range = 'NO'
                 time.sleep(1)
-            '''
+            
             # 修正旧版覆盖选项
             if overwrite == '是' or overwrite == '否':
                 with open("config.ini", encoding = 'UTF-8-SIG') as file:
@@ -313,7 +295,7 @@ def read_config(config_file):
                 BD_AI_client = None
             Black_List = Black_List.split('、')
             return (
-            repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy_Range, Proxy_Link, aifix, debug,
+            repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy, aifix, debug,
             deleteall, download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP,
             Black_List)
         except:
@@ -354,13 +336,10 @@ AI_Fix = 是
 
 ### HTTP / Socks 局部代理 ###
 # 推荐开启全局代理而不是使用此局部代理
-# Proxy_Range 为使用代理的范围，以下为可选项。本地主机和局域网的连接均自动不经过代理。
-# ALL - 所有场景均经过代理，REPO - 仅女友仓库经过代理，HOST - 仅媒体服务器经过代理，NO - 关闭局部代理（默认）
-# Proxy_Link 为代理地址，格式如下
-# HTTP 代理格式为 http://IP:端口 , 如 http://localhost:8088
-# Socks 代理格式为 socks+协议版本://IP:端口 , 如 socks5://localhost:8087
-Proxy_Range = NO
-Proxy_Link = 
+# 代理地址，格式如下
+# HTTP 代理格式为 http://IP:端口 , 如 http://localhost:7890
+# Socks 代理格式为 socks+协议版本://IP:端口 , 如 socks5h://localhost:7890
+Proxy = 
 
 ### 厂牌黑名单###
 # 请访问女友仓库 Content 文件夹确认最新的已收录的厂牌列表，下述收录列表更新有延迟：ラグジュTV、DMM(骑)、DMM(步)、痴女天堂、溜池ゴロー、无垢、WANZ、KMP、KiraKira、Ideapocket、DAS、BeFree、えむっ娘ラボ、OPPAI、Honnaka、桃太郎、Prestige、Madonna、Fitch、Attackers、未満、S1、Moodyz、Warashi、Premium、body、Kawaii、GRAPHIS、MUTEKI、Lovepop、Honey、FALENO、AVDBS、Derekhsu、Javrave、Nanairo
@@ -428,11 +407,7 @@ def read_persons(host_url, api_key, emby_flag):
     else:
         host_url_persons = host_url + 'jellyfin/Persons?api_key=' + api_key  # &PersonTypes=Actor
     try:
-        if Proxy_Range in ['NO', 'REPO']:
-            rqs_emby = session.get(url=host_url_persons,
-                                   headers={"User-Agent": 'Gfriends_Inputer/' + version.replace('v', '')}, timeout=5)
-        else:
-            rqs_emby = session.get(url=host_url_persons,
+        rqs_emby = session.get(url=host_url_persons,
                                    headers={"User-Agent": 'Gfriends_Inputer/' + version.replace('v', '')},
                                    proxies=proxies, timeout=5)
     except requests.exceptions.ConnectionError:
@@ -464,7 +439,7 @@ def read_persons(host_url, api_key, emby_flag):
         output = sorted(loads(rqs_emby.text)['Items'], key=lambda x: x['Name'])  # 按姓名排序
         print('√ 连接 Emby / Jellyfin 服务器成功')
         print('   演职人员：' + str(len(output)) + '人\n')
-        return (output, emby_flag)
+        return output, emby_flag
     except:
         print('× 连接 Emby / Jellyfin 服务器成功，但是服务器的演员列表不能识别：' + rqs_emby.headers['Content-Type'])
         sys.exit()
@@ -484,7 +459,7 @@ def del_all():
     print('【调试模式】删除所有头像\n')
     (list_persons, emby_flag) = read_persons(host_url, api_key, True)
     rewriteable_word('按任意键开始...')
-    os.system('pause>nul') if WINOS else input('按任意键开始...')
+    os.system('pause>nul') if WINOS else input('Press Enter to start...')
     with alive_bar(len(list_persons), enrich_print=False, dual_line=True) as bar:
         for dic_each_actor in list_persons:
             bar.text('正在删除：'+dic_each_actor['Name'])
@@ -513,10 +488,7 @@ def del_all():
 def get_ip():
     global public_ip
     try:
-        if Proxy_Range == 'NO':
-            response = session.get('https://api.myip.la/cn?json')
-        else:
-            response = session.get('https://api.myip.la/cn?json', proxies=proxies)
+        response = session.get('https://api.myip.la/cn?json', proxies=proxies)
         ip_country_code = loads(response.text)['location']['country_code']
         ip_country_name = loads(response.text)['location']['country_name']
         ip_city = loads(response.text)['location']['province']
@@ -532,10 +504,7 @@ def check_update():
     rewriteable_word('>> 检查更新...')
     try:
         get_ip()
-        if Proxy_Range == 'NO':
-            response = session.get('https://api.github.com/repos/gfriends/gfriends-inputer/releases', timeout=3)
-        else:
-            response = session.get('https://api.github.com/repos/gfriends/gfriends-inputer/releases', proxies=proxies,
+        response = session.get('https://api.github.com/repos/gfriends/gfriends-inputer/releases', proxies=proxies,
                                    timeout=3)
         response.encoding = 'utf-8'
         if response.status_code != 200:
@@ -550,7 +519,7 @@ def check_update():
             os.system('pause>nul') if WINOS else input('按任意键跳过更新...')
             print('即将跳过更新。不推荐跳过更新，如遇问题请及时更新。')
             time.sleep(5)
-    except (requests.exceptions.ConnectTimeout):
+    except requests.exceptions.ConnectTimeout:
         print('× 检查更新超时，网络连接不稳定！\n')
         print('即将跳过更新。')
         time.sleep(3)
@@ -573,7 +542,7 @@ else:
         os.chdir(config_path)  # 切换工作目录
 (config_file, quiet_flag) = argparse_function(version)
 if quiet_flag: sys.stdout = open("./Getter/quiet.log", "w", buffering=1)
-(repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy_Range, Proxy_Link, aifix, debug, deleteall,
+(repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy, aifix, debug, deleteall,
  download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP, Black_List) = read_config(
     config_file)
 
@@ -583,7 +552,10 @@ session.mount('http://', requests.adapters.HTTPAdapter(max_retries=max_retries))
 session.mount('https://', requests.adapters.HTTPAdapter(max_retries=max_retries))
 
 # 局部代理
-if Proxy_Range != 'NO': proxies = {'http': Proxy_Link, 'https': Proxy_Link}
+if Proxy:
+    proxies = {'http': Proxy, 'https': Proxy}
+else:
+    proxies = None
 
 # 检查更新
 public_ip = None
@@ -601,8 +573,12 @@ proc_flag = False
 print('Gfriends Inputer ' + version)
 print('https://git.io/gfriends\n')
 
+if not quiet_flag:
+    rewriteable_word('按任意键开始...')
+    os.system('pause>nul') if WINOS else input('Press Enter to start...')
+
 # 代理配置提示
-if Proxy_Range == 'NO':
+if not proxies:
     if public_ip and 'CN' in public_ip:
         print(public_ip, '推荐开启全局代理\n')
     elif public_ip and 'CN' not in public_ip:
@@ -611,19 +587,11 @@ if Proxy_Range == 'NO':
         print('推荐开启全局代理\n')
 else:
     if public_ip and 'CN' in public_ip:
-        print(public_ip, '已连通局部代理，但这个代理似乎不具有科学加速的功效，不过还是会尝试',
-              Proxy_Range.replace('ALL', '所有场景均经由代理连接').replace('HOST', '媒体服务器经由代理连接').replace('REPO', '女友仓库经由代理连接'),
-              '\n')
+        print(public_ip, '已连通局部代理，但这个代理似乎不具有科学加速的功效\n')
     elif public_ip and 'CN' not in public_ip:
-        print(public_ip, '已连通局部代理',
-              Proxy_Range.replace('ALL', '所有场景均经由代理连接').replace('HOST', '媒体服务器经由代理连接').replace('REPO', '女友仓库经由代理连接'),
-              '\n')
+        print(public_ip, '已连通局部代理\n')
     else:
-        print('已配置局部代理 ' + Proxy_Link + '，但似乎无法连通，请检查其格式和可用性\n')
-
-if not quiet_flag:
-    rewriteable_word('按任意键开始...')
-    os.system('pause>nul') if WINOS else input('按任意键开始...')
+        print('已配置局部代理 ' + Proxy + '，但似乎无法连通，请检查其格式和可用性\n')
 
 try:
     (list_persons, emby_flag) = read_persons(host_url, api_key, True)
@@ -654,12 +622,12 @@ try:
                 continue
         if not os.path.exists(local_path + actor_name + ".jpg"):
             pic_link = get_gfriends_link(actor_name)
-            if pic_link == None:
+            if not pic_link:
                 old_actor_name = actor_name
                 actor_name = re.sub(r'（.*）', '', actor_name)
                 actor_name = re.sub(r'\(.*\)', '', actor_name)
                 pic_link = get_gfriends_link(actor_name)
-                if pic_link == None:
+                if not pic_link:
                     actor_log.write('未找到：' + actor_name + '\n')
                     num_fail += 1
                     continue
@@ -704,7 +672,7 @@ try:
                         time.sleep(0.01)
                     else:
                         break
-            except (KeyboardInterrupt):
+            except KeyboardInterrupt:
                 sys.exit()
             except:
                 if debug: print(format_exc())
@@ -736,7 +704,7 @@ try:
                             time.sleep(0.01)
                         else:
                             break
-                except (KeyboardInterrupt):
+                except KeyboardInterrupt:
                     sys.exit()
                 except:
                     with bar.pause():
