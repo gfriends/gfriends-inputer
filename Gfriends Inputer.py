@@ -2,18 +2,18 @@
 # Gfriends Inputer / 女友头像仓库导入工具
 # Licensed under the MIT license.
 # Designed by xinxin8816, many thanks for junerain123, ddd354, moyy996.
-version = 'v2.94'
+version = 'v3.0.0'
 
 import requests, os, io, sys, time, re, threading, argparse
 from alive_progress import alive_bar
 from configparser import RawConfigParser
 from traceback import format_exc
 from hashlib import md5
+from cv2dnn import find_faces
 from base64 import b64encode
 from json import loads
 from PIL import Image, ImageFilter
 from aip import AipBodyAnalysis
-
 
 def fix_size(type, path):
     try:
@@ -29,15 +29,17 @@ def fix_size(type, path):
             elif type == '2':
                 fixed_pic = pic.crop((int(wf / 2 - 1 / 3 * hf), 0, int(wf / 2 + 1 / 3 * hf), int(hf)))  # 像素中线向两边扩展
                 fixed_pic.save(path, quality=95)
-            elif type == '3':
+            elif type == '3' or type == '4':
                 try:
-                    with open(path, 'rb') as fp:
-                        x_nose = int(BD_AI_client.bodyAnalysis(fp.read())["person_info"][0]['body_parts']['nose'][
-                                         'x'])  # 返回鼻子横坐标
-                    if BD_VIP == '否':
-                        time.sleep(0.1)  # 免费用户QPS≈2，排除网络延迟及性能损耗时间，此值可以稍降低
+                    if type == '3':
+                        x_nose, y_nose = find_faces(path)  # 传递二进制RGB图像，返回鼻子横、纵坐标
                     else:
-                        time.sleep(1 / int(1.1 * BD_VIP))
+                        with open(path, 'rb') as fp:
+                            x_nose = int(BD_AI_client.bodyAnalysis(fp.read())["person_info"][0]['body_parts']['nose']['x'])  # 返回鼻子横坐标
+                        if BD_VIP == '否':
+                            time.sleep(0.2)  # 免费用户QPS≈2，排除网络延迟及性能损耗时间，此值可以稍降低
+                        else:
+                            time.sleep(1 / int(1.1 * BD_VIP))
                     if x_nose + 1 / 3 * hf > wf:  # 判断鼻子在图整体的位置
                         x_left = wf - 2 / 3 * hf  # 以右为边
                     elif x_nose - 1 / 3 * hf < 0:
@@ -46,7 +48,7 @@ def fix_size(type, path):
                         x_left = x_nose - 1 / 3 * hf  # 以鼻子为中线向两边扩展
                     fixed_pic = pic.crop((x_left, 0, x_left + 2 / 3 * hf, hf))
                     fixed_pic.save(path, quality=95)
-                except (KeyboardInterrupt):
+                except KeyboardInterrupt:
                     sys.exit()
                 except:
                     print('!! ' + path + ' AI 分析失败，跳过 AI 直接裁剪')
@@ -111,7 +113,6 @@ def asyncc(f):
     def wrapper(*args, **kwargs):
         thr = threading.Thread(target=f, args=args, kwargs=kwargs)
         thr.start()
-
     return wrapper
 
 
@@ -148,7 +149,7 @@ def download_avatar(url, actor_name, proc_md5):
     try:
         Image.open(io.BytesIO(gfriends_response.content)).verify()  # 校验下载的图片
     except:
-        print('!! ' + pic_path + ' 校验失败，可能头像已损坏。')
+        print('!! ' + pic_path + ' 校验失败，可能下载的头像不完整。')
     with open(pic_path, "wb") as code:
         code.write(gfriends_response.content)
     actor_md5 = md5(actor_name.encode('UTF-8')).hexdigest()[12:-12]
@@ -330,6 +331,11 @@ Proxy_Link =
 # 女友仓库默认提供质量优先的头像。但是这其中，某些厂牌官方给演员的头像可能真的很难看，如果你不想从仓库下载到某些厂牌官网的头像，请填写其厂牌名。多个厂牌请使用中文顿号（、）分隔。
 Black_List = 无
 
+### 多头像下载方式 ###
+# 仓库内可能存储了一位女友的多张头像，遇到这种情况默认选择最优的一张。或者您也可以让程序把对应头像全部下载，并在导入前提醒您手动挑选。
+# 0 - 自动优选
+# 1 - 手动挑选（当有大量头像需要导入时，谨慎选择）
+
 [导入设置]
 ### 本地头像文件夹 ###
 # 将第三方头像包或自己收集的头像移动至该目录，可优先于仓库导入服务器。仅支持非子目录下的 jpg 格式。
@@ -351,8 +357,9 @@ MAX_UL = 20
 # 0 - 不处理直接导入
 # 1 - 高斯平滑处理（填充毛玻璃样式）
 # 2 - 直接裁剪处理（可能会裁剪到演员面部）
-# 3 - AI检测并裁剪处理（效果最好，需配置百度人体定位 AI）
-Size_Fix = 2
+# 3 - 本地 AI 检测并裁剪处理（默认，速度取决于设备性能）
+# 4 - 云端 AI 检测并裁剪处理（需配置百度人体定位 AI）
+Size_Fix = 3
 
 ### 百度人体定位 AI ###
 # 具体使用说明请参阅仓库项目 README
@@ -440,11 +447,12 @@ def rewriteable_word(word):
 def del_all():
     print('【调试模式】删除所有头像\n')
     (list_persons, emby_flag) = read_persons(host_url, api_key, True)
-    rewriteable_word('按任意键开始...');
+    rewriteable_word('按任意键开始...')
     os.system('pause>nul') if WINOS else input('按任意键开始...')
-    with alive_bar(len(list_persons), theme='ascii', enrich_print=False) as bar:
+    with alive_bar(len(list_persons), enrich_print=False, dual_line=True) as bar:
         for dic_each_actor in list_persons:
-            bar(dic_each_actor['Name'])
+            bar.text('正在删除：'+dic_each_actor['Name'])
+            bar()
             if dic_each_actor['ImageTags']:
                 if emby_flag:
                     url_post_img = host_url + 'emby/Items/' + dic_each_actor[
@@ -465,7 +473,7 @@ def del_all():
     if WINOS: print('按任意键退出程序...'); os.system('pause>nul')
     sys.exit()
 
-
+@asyncc
 def get_ip():
     global public_ip
     try:
@@ -487,8 +495,7 @@ def get_ip():
 def check_update():
     rewriteable_word('>> 检查更新...')
     try:
-        get_ip_thread = threading.Thread(target=get_ip)
-        get_ip_thread.start()
+        get_ip()
         if Proxy_Range == 'NO':
             response = session.get('https://api.github.com/repos/gfriends/gfriends-inputer/releases', timeout=3)
         else:
@@ -497,13 +504,13 @@ def check_update():
         response.encoding = 'utf-8'
         if response.status_code != 200:
             print('× 检查更新失败！返回了一个错误： {}\n'.format(response.status_code))
-            rewriteable_word('按任意键跳过...');
+            rewriteable_word('按任意键跳过...')
             os.system('pause>nul') if WINOS else input('按任意键跳过...')
         if version.replace('v', '') < loads(response.text)[0]['tag_name'].replace('v', ''):
             print(loads(response.text)[0]['tag_name'] + ' 新版本发布啦！\n')
             # print(re.search('What\'s New?.*?(?=\r\n<details>)',loads(response.text)[0]['body'],flags = re.S).group(0).replace('*',''))
             print('请通过如下链接下载更新：\nhttps://git.io/JL0tk\n')
-            rewriteable_word('按任意键跳过更新...');
+            rewriteable_word('按任意键跳过更新...')
             os.system('pause>nul') if WINOS else input('按任意键跳过更新...')
             print('即将跳过更新。不推荐跳过更新，如遇问题请及时更新。')
             time.sleep(5)
@@ -514,13 +521,20 @@ def check_update():
     except:
         if debug: print(format_exc())
         print('× 检查更新失败！\n')
-        rewriteable_word('按任意键跳过...');
+        rewriteable_word('按任意键跳过...')
         os.system('pause>nul') if WINOS else input('按任意键跳过更新...')
     if WINOS and not quiet_flag: os.system('cls')
 
 
 WINOS = True if sys.platform.startswith('win') else False
-if WINOS: os.system('title Gfriends Inputer ' + version)
+if WINOS:
+    os.system('title Gfriends Inputer ' + version)
+else:
+    # 类 Unix 系统的默认工作目录不在程序所在文件夹
+    config_path = '/'.join((sys.argv[0].replace('\\', '/')).split('/')[:-1])
+    work_path = os.getcwd().replace('\\', '/')
+    if work_path != config_path:
+        os.chdir(config_path)  # 切换工作目录
 (config_file, quiet_flag) = argparse_function(version)
 if quiet_flag: sys.stdout = open("./Getter/quiet.log", "w", buffering=1)
 (repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy_Range, Proxy_Link, aifix, debug, deleteall,
@@ -572,7 +586,7 @@ else:
         print('已配置局部代理 ' + Proxy_Link + '，但似乎无法连通，请检查其格式和可用性\n')
 
 if not quiet_flag:
-    rewriteable_word('按任意键开始...');
+    rewriteable_word('按任意键开始...')
     os.system('pause>nul') if WINOS else input('按任意键开始...')
 
 try:
@@ -692,10 +706,11 @@ try:
                     print('× 网络连接异常，跳过下载：' + str(actor_name) + '\n')
                     continue
         else:
-            with alive_bar(len(link_dict), theme='ascii', enrich_print=False) as bar:
+            with alive_bar(len(link_dict), enrich_print=False, dual_line=True) as bar:
                 for actor_name, link in link_dict.items():
                     try:
-                        bar(re.sub(r'（.*）', '', actor_name)) if '（' in actor_name else bar(actor_name)
+                        bar.text('正在下载：'+re.sub(r'（.*）', '', actor_name)) if '（' in actor_name else bar.text('正在下载：'+actor_name)
+                        bar()
                         proc_md5 = md5((actor_name + '+1').encode('UTF-8')).hexdigest()[13:-13]
                         if not proc_flag or (proc_flag and not proc_md5 in proc_list):
                             download_avatar(link, actor_name, proc_md5)  # 记录下载完成的操作放到子线程中，以防没下完中断的断点没记录到
@@ -767,10 +782,11 @@ try:
                     if not result: pic_path_dict.pop(filename)
                 proc_log.write(proc_md5 + '\n')
         else:
-            with alive_bar(len(pic_path_dict), theme='ascii', enrich_print=False) as bar:
+            with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
                 for filename, pic_path in pic_path_dict.items():
-                    bar(re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar(
+                    bar.text('正在优化：'+re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text('正在优化：'+
                         filename.replace('.jpg', ''))
+                    bar()
                     proc_md5 = md5((filename + '+2').encode('UTF-8')).hexdigest()[13:-13]
                     if not proc_flag or (proc_flag and not proc_md5 in proc_list):
                         result = fix_size(fixsize, pic_path)
@@ -800,10 +816,11 @@ try:
                     break
             num_suc += 1
     else:
-        with alive_bar(len(pic_path_dict), theme='ascii', enrich_print=False) as bar:
+        with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
             for filename, pic_path in pic_path_dict.items():
-                bar(re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar(
+                bar.text('正在导入：'+re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text('正在导入：'+
                     filename.replace('.jpg', ''))
+                bar()
                 proc_md5 = md5((filename + '+3').encode('UTF-8')).hexdigest()[13:-13]
                 if not proc_flag or (proc_flag and not proc_md5 in proc_list):
                     with open(pic_path, 'rb') as pic_bit:
