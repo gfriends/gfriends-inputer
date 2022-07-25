@@ -21,39 +21,25 @@ jobs:
     - name: Set Up Python
       uses: actions/setup-python@v2
       with:
-        python-version: 3.8
+        python-version: 3.9
 
-    - name: Build For Windows
-      if: matrix.os == 'windows-latest'
-      run: |
-        curl -O https://eternallybored.org/misc/wget/1.20.3/64/wget.exe #curl直接Py源码会失败
-        ./wget.exe 'https://raw.githubusercontent.com/gfriends/gfriends-inputer/master/Gfriends Inputer.py'
-        python -m pip install --upgrade pip
-        pip install alive-progress==1.5.1
-        pip install requests
-        pip install requests[socks]
-        pip install -U --force-reinstall gevent
-        pip install baidu-aip==2.2.18.0
-        pip install Pillow==7.1.1
-        pip install pyinstaller
-        pyinstaller -F 'Gfriends Inputer.py'
+    - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
 
-    - name: Build For Mac/Linux
-      if: matrix.os == 'macos-latest' || matrix.os == 'ubuntu-latest'
+    - name: Build For Windows/Mac/Linux
       run: |
-        wget 'https://raw.githubusercontent.com/gfriends/gfriends-inputer/master/Gfriends Inputer.py'
-        python -m pip install --upgrade pip
-        pip install alive-progress==1.5.1
-        pip install requests
-        pip install requests[socks]
-        pip install -U --force-reinstall gevent
-        pip install baidu-aip==2.2.18.0
-        pip install Pillow==7.1.1
-        pip install pyinstaller
-        pyinstaller -F 'Gfriends Inputer.py'
+        pyinstaller -F 'Gfriends Inputer.py' --collect-all grapheme
+
+      - name: Copy config.ini
+        run: |
+          cp ./Lib/opencv_face_detector_uint8.pb ./dist/Lib/opencv_face_detector_uint8.pb
+          cp ./Lib/opencv_face_detector.pbtxt ./dist/Lib/opencv_face_detector.pbtxt
 
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v1
       with:
-        name: Gfriends-Inputer-${{ matrix.os }}
+        name: Gfriends-Inputer-${{ runner.os }}
         path: dist

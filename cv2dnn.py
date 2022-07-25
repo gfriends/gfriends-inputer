@@ -4,12 +4,12 @@ import numpy as np
 from PIL import Image
 
 # Load a model stored in Caffe
-# opencv_dnn_model = cv2.dnn.readNetFromCaffe("./lib/deploy.prototxt",
-#                                              "./lib/res10_300x300_ssd_iter_140000_fp16.caffemodel")
+# opencv_dnn_model = cv2.dnn.readNetFromCaffe("./Lib/deploy.prototxt",
+#                                              "./Lib/res10_300x300_ssd_iter_140000_fp16.caffemodel")
 
 # Load a model stored in TensorFlow
-opencv_dnn_model = cv2.dnn.readNetFromTensorflow("./lib/opencv_face_detector_uint8.pb",
-                                                "./lib/opencv_face_detector.pbtxt")
+opencv_dnn_model = cv2.dnn.readNetFromTensorflow("./Lib/opencv_face_detector_uint8.pb",
+                                                "./Lib/opencv_face_detector.pbtxt")
 
 def find_faces(img):
     # 传递路径：等效于 cv2.imread，但增加了支持中文名支持，仅支持 RGB 图像；np.fromfile 读取为数组，cv2.imdecode 解码为图像
