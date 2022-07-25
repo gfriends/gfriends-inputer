@@ -628,10 +628,8 @@ if not quiet_flag:
 try:
     (list_persons, emby_flag) = read_persons(host_url, api_key, True)
     gfriends_map = get_gfriends_map(repository_url)
-    if os.path.exists('./Getter/未收录的演员清单.txt'): os.remove('./Getter/未收录的演员清单.txt')
-    write_txt("./Getter/未收录的演员清单.txt", '【未收录的演员清单】\n（该清单仅供参考，下面可能还有导演、编剧、赞助商等其他人的名字，但是女友头像仓库只会收录日本女友。）\n\n')
-    if os.path.exists('./Getter/已匹配的演员清单.txt'): os.remove('./Getter/已匹配的演员清单.txt')
-    write_txt("./Getter/已匹配的演员清单.txt", '【已匹配的演员清单】\n（该清单仅供参考，记录的名字都是女友头像仓库已经收录头像的。根据个人配置，可能会下载导入，也可能会跳过）\n\n')
+    actor_log = open('./Getter/演员清单.txt', 'w', encoding="UTF-8", buffering=1)
+    actor_log.write('【演员清单】\n该清单仅供参考，下面可能还有导演、编剧、赞助商等其他人的名字，但是女友头像仓库只会收录日本女友。\n而已匹配到的头像则会根据个人配置，下载导入或会跳过\n\n')
 
     rewriteable_word('>> 引擎初始化...')
     md5_persons = md5(str(list_persons).encode('UTF-8')).hexdigest()[14:-14]
@@ -651,7 +649,7 @@ try:
             num_exist += 1
             exist_list.append(actor_name)
             if overwrite == '0':
-                write_txt("./Getter/已匹配的演员清单.txt", '跳过：' + actor_name + '\n')
+                actor_log.write('跳过：' + actor_name + '\n')
                 num_skip += 1
                 continue
         if not os.path.exists(local_path + actor_name + ".jpg"):
@@ -662,16 +660,17 @@ try:
                 actor_name = re.sub(r'\(.*\)', '', actor_name)
                 pic_link = get_gfriends_link(actor_name)
                 if pic_link == None:
-                    write_txt("./Getter/未收录的演员清单.txt", '未找到：' + actor_name + '\n')
+                    actor_log.write('未找到：' + actor_name + '\n')
                     num_fail += 1
                     continue
                 if old_actor_name in exist_list:
                     exist_list.remove(old_actor_name)
                     exist_list.append(actor_name)
-            write_txt("./Getter/已匹配的演员清单.txt", '下载：' + actor_name + '\n')
+            actor_log.write('下载：' + actor_name + '\n')
             link_dict[actor_name] = pic_link
         actor_dict[actor_name] = actor_id
         inputed_dict = {}
+    actor_log.close()
 
     if overwrite == '2':
         md5_host_url = md5(host_url.encode('UTF-8')).hexdigest()[14:-14]
