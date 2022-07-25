@@ -12,6 +12,7 @@ from traceback import format_exc
 from hashlib import md5
 from base64 import b64encode
 from json import loads
+from lxml import etree
 from PIL import Image, ImageFilter
 from aip import AipBodyAnalysis
 
@@ -72,6 +73,37 @@ def fix_size(type, path):
         if os.path.exists(failed_path): os.remove(failed_path)
         os.rename(path, failed_path)
         return False
+
+def xslist_search(id, name):
+    try:
+        # 搜索
+        url = "https://xslist.org/search?lg=zh&query=" + name
+        response = session.get(url, proxies=proxies, timeout=10)
+        html = etree.HTML(response.text)
+        detial_url = html.xpath('/html/body/ul/li/h3/a/@href')[0]
+
+        # 获取详情页
+        response = session.get(detial_url, proxies=proxies, timeout=10)
+        html = etree.HTML(response.text)
+        detial_list = html.xpath('/html/body/div[1]/div[3]/div/p[1]/descendant-or-self::text()')
+        detial_info = ''
+        for info in detial_list:
+            info = info.replace(' ','',1) # 删掉多余空格
+            if '身高' in info or '国籍' in info:
+                detial_info += info
+            else:
+                detial_info += info + '<br>'
+
+        # 重组请求json
+        detial_json =  {'Name': name,
+         'ProviderIds': 'XSlist got by gfriends:'+detial_url,
+         'Taglines': ['日本AV女优'],
+         'Overview': detial_info}
+
+        url_post = host_url + 'emby/Items/' + id + '?api_key=' + api_key
+        response = session.post(url_post,json = detial_json, proxies=proxies)
+    except:
+        return
 
 
 def get_gfriends_map(repository_url):
@@ -232,6 +264,7 @@ def read_config(config_file):
             Proxy = config_settings.get("下载设置", "Proxy")
             download_path = config_settings.get("下载设置", "Download_Path")
             max_upload_connect = config_settings.getint("导入设置", "MAX_UL")
+            Get_Intro = config_settings.getint("导入设置", "Get_Intro")
             local_path = config_settings.get("导入设置", "Local_Path")
             BD_App_ID = config_settings.get("导入设置", "BD_App_ID")
             BD_API_Key = config_settings.get("导入设置", "BD_API_Key")
@@ -295,7 +328,7 @@ def read_config(config_file):
                 BD_AI_client = None
             return (
                 repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy, aifix, debug,
-                deleteall, download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP)
+                deleteall, download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP, Get_Intro)
         except:
             print(format_exc())
             print('× 无法读取 config.ini。如果这是旧版本的配置文件，请删除后重试。\n')
@@ -329,22 +362,28 @@ MAX_Retry = 3
 Repository_Url = 默认
 
 ### AI 优化（仅支持官方仓库）###
-# 在不可避免下载低质量头像时，自动挑选经 AI 算法放大优化的副本，质量更高但更占空间
+# 在不可避免下载低质量头像时，自动挑选经 AI 算法放大优化的副本，质量更高但更占空间。
 AI_Fix = 是
 
 ### 多头像下载方式 ###
-# 仓库内可能存储了一位女友的多张头像，遇到这种情况默认选择最优的一张。或者您也可以让程序把对应头像全部下载，并在导入前提醒您手动挑选。
+# 仓库内可能存储了一位女友的多张头像，大多数情况会自动选择最优的一张。或者您也可以让程序把对应头像全部下载，并在导入前提醒您手动挑选。
 # 0 - 自动优选
 # 1 - 手动挑选（当有大量头像需要导入时，谨慎选择）
+Conflict_Proc = 0
 
 ### HTTP / Socks 局部代理 ###
 # 推荐开启全局代理而不是使用此局部代理
-# 代理地址，格式如下
 # HTTP 代理格式为 http://IP:端口 , 如 http://localhost:7890
 # Socks 代理格式为 socks+协议版本://IP:端口 , 如 socks5h://localhost:7890
 Proxy = 
 
 [导入设置]
+### 搜索女友简介（测试版） ###
+# 顺便搜索演员信息并导入。为降低来源网站负载，只能单线程，因此会拖慢导入速度。
+# 0 - 不导入简介
+# 1 - 从 XSlist 获取简介
+Get_Intro = 0
+
 ### 本地头像文件夹 ###
 # 将第三方头像包或自己收集的头像移动至该目录，可优先于仓库导入服务器。仅支持 jpg 格式。
 Local_Path = ./Avatar/
@@ -358,6 +397,7 @@ OverWrite = 2
 ### 导入线程数 ###
 # 导入至本地或内网服务器时，网络稳定可适当增大导入线程数（推荐：20-100）
 # 导入至远程服务器时，可适当减小导入线程数（推荐：5-20）
+# 开启搜索女友简介时此选项无效
 MAX_UL = 20
 
 ### 头像尺寸优化 ###
@@ -561,7 +601,7 @@ else:
 (config_file, quiet_flag) = argparse_function(version)
 if quiet_flag: sys.stdout = open("./Getter/quiet.log", "w", buffering=1)
 (repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy, aifix, debug, deleteall,
- download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP) = read_config(
+ download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP, Get_Intro) = read_config(
     config_file)
 
 # 持久会话
@@ -743,18 +783,20 @@ try:
 
     # 构建路径映射
     for filename in os.listdir(download_path):
-        if '.jpg' in filename and filename.replace('.jpg', '') in actor_dict:
+        actorname = filename.replace('.jpg', '')
+        if '.jpg' in filename and actorname in actor_dict:
             if overwrite == '2':
-                if filename.replace('.jpg', '') in link_dict:  # link_dict 已经初始化筛选，key 为需要导入的演员名
+                if actorname in link_dict:  # link_dict 已经初始化筛选，key 为需要导入的演员名
                     pic_path_dict[filename] = download_path + filename
             else:
                 pic_path_dict[filename] = download_path + filename
     for root, dirs, files in os.walk(local_path):
         for filename in files:
+            actorname = filename.replace('.jpg', '')
             file_path = os.path.join(root,filename)
-            if '.jpg' in filename and filename.replace('.jpg', '') in actor_dict:
-                if overwrite == '2' and filename.replace('.jpg', '') in exist_list:  # 覆盖导入且现在头像不存在
-                    actor_md5 = md5(filename.replace('.jpg', '').encode('UTF-8')).hexdigest()[12:-12]
+            if '.jpg' in filename and actorname in actor_dict:
+                if overwrite == '2' and actorname in exist_list:  # 覆盖导入且现在头像不存在
+                    actor_md5 = md5(actorname.encode('UTF-8')).hexdigest()[12:-12]
                     file_size = str(os.path.getsize(file_path))
                     if actor_md5 not in inputed_dict or inputed_dict[actor_md5] != file_size:
                         pic_path_dict[filename] = file_path
@@ -794,21 +836,21 @@ try:
     print('\n>> 导入头像...')
     with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
         for filename, pic_path in pic_path_dict.items():
+            actorname = filename.replace('.jpg', '')
             bar.text('正在导入：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
-                '正在导入：' +
-                filename.replace('.jpg', ''))
+                '正在导入：' + actorname)
             bar()
             proc_md5 = md5((filename + '+3').encode('UTF-8')).hexdigest()[13:-13]
             if not proc_flag or (proc_flag and not proc_md5 in proc_list):
                 with open(pic_path, 'rb') as pic_bit:
                     b6_pic = b64encode(pic_bit.read())
                 if emby_flag:
-                    url_post_img = host_url + 'emby/Items/' + actor_dict[
-                        filename.replace('.jpg', '')] + '/Images/Primary?api_key=' + api_key
+                    url_post_img = host_url + 'emby/Items/' + actor_dict[actorname] + '/Images/Primary?api_key=' + api_key
                 else:
-                    url_post_img = host_url + 'jellyfin/Items/' + actor_dict[
-                        filename.replace('.jpg', '')] + '/Images/Primary?api_key=' + api_key
+                    url_post_img = host_url + 'jellyfin/Items/' + actor_dict[actorname] + '/Images/Primary?api_key=' + api_key
                 input_avatar(url_post_img, b6_pic)
+                if Get_Intro == 1:
+                    xslist_search(actor_dict[actorname], actorname)
             proc_log.write(proc_md5 + '\n')
             while True:
                 if threading.activeCount() > max_upload_connect + 1:
