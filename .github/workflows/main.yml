@@ -18,6 +18,8 @@ jobs:
         os: [macos-latest, windows-latest, ubuntu-latest]
 
     steps:
+    - uses: actions/checkout@v2
+    
     - name: Set Up Python
       uses: actions/setup-python@v2
       with:
