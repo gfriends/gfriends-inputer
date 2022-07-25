@@ -7,14 +7,13 @@ version = 'v3.0.0'
 import requests, os, io, sys, time, re, threading, argparse
 from alive_progress import alive_bar
 from configparser import RawConfigParser
+from Lib.cv2dnn import find_faces
 from traceback import format_exc
 from hashlib import md5
-from cv2dnn import find_faces
 from base64 import b64encode
 from json import loads
 from PIL import Image, ImageFilter
 from aip import AipBodyAnalysis
-
 
 def fix_size(type, path):
     try:
