@@ -63,6 +63,8 @@ def fix_size(type, path):
         if 'pic' in vars(): del pic  # 如果图片已打开，则关闭
         if 'fixed_pic' in vars(): del fixed_pic
         print('!! ' + path + ' 可能已损坏，跳过。')
+
+        # 创建一个 Failed 文件夹并把失败头像移动进去
         failed_dir = re.sub(r'(.*/)(.*)', r'\1Failed/', path)
         failed_path = re.sub(r'(.*/)(.*)', r'\1Failed/\2', path)
         if not os.path.exists(failed_dir): os.makedirs(failed_dir)
@@ -129,9 +131,7 @@ def get_gfriends_map(repository_url):
     output = {}
     for second in map_json['Content'].keys():
         for k, v in map_json['Content'][second].items():
-            secondstr = re.sub(".*-", "", second)
-            if not secondstr in Black_List:
-                output[k[:-4]] = gfriends_template.format('Content', second, v)
+            output[k[:-4]] = gfriends_template.format('Content', second, v)
     print('   库存头像：' + str(map_json['Information']['TotalNum']) + '枚\n')
     return output
 
@@ -228,7 +228,6 @@ def read_config(config_file):
             max_retries = config_settings.getint("下载设置", "MAX_Retry")
             Proxy = config_settings.get("下载设置", "Proxy")
             download_path = config_settings.get("下载设置", "Download_Path")
-            Black_List = config_settings.get("下载设置", "Black_List")
             max_upload_connect = config_settings.getint("导入设置", "MAX_UL")
             local_path = config_settings.get("导入设置", "Local_Path")
             BD_App_ID = config_settings.get("导入设置", "BD_App_ID")
@@ -293,11 +292,9 @@ def read_config(config_file):
                 BD_AI_client = AipBodyAnalysis(BD_App_ID, BD_API_Key, BD_Secret_Key)
             else:
                 BD_AI_client = None
-            Black_List = Black_List.split('、')
             return (
             repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy, aifix, debug,
-            deleteall, download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP,
-            Black_List)
+            deleteall, download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP)
         except:
             print(format_exc())
             print('× 无法读取 config.ini。如果这是旧版本的配置文件，请删除后重试。\n')
@@ -334,22 +331,17 @@ Repository_Url = 默认
 # 在不可避免下载低质量头像时，自动挑选经 AI 算法放大优化的副本，质量更高但更占空间
 AI_Fix = 是
 
+### 多头像下载方式 ###
+# 仓库内可能存储了一位女友的多张头像，遇到这种情况默认选择最优的一张。或者您也可以让程序把对应头像全部下载，并在导入前提醒您手动挑选。
+# 0 - 自动优选
+# 1 - 手动挑选（当有大量头像需要导入时，谨慎选择）
+
 ### HTTP / Socks 局部代理 ###
 # 推荐开启全局代理而不是使用此局部代理
 # 代理地址，格式如下
 # HTTP 代理格式为 http://IP:端口 , 如 http://localhost:7890
 # Socks 代理格式为 socks+协议版本://IP:端口 , 如 socks5h://localhost:7890
 Proxy = 
-
-### 厂牌黑名单###
-# 请访问女友仓库 Content 文件夹确认最新的已收录的厂牌列表，下述收录列表更新有延迟：ラグジュTV、DMM(骑)、DMM(步)、痴女天堂、溜池ゴロー、无垢、WANZ、KMP、KiraKira、Ideapocket、DAS、BeFree、えむっ娘ラボ、OPPAI、Honnaka、桃太郎、Prestige、Madonna、Fitch、Attackers、未満、S1、Moodyz、Warashi、Premium、body、Kawaii、GRAPHIS、MUTEKI、Lovepop、Honey、FALENO、AVDBS、Derekhsu、Javrave、Nanairo
-# 女友仓库默认提供质量优先的头像。但是这其中，某些厂牌官方给演员的头像可能真的很难看，如果你不想从仓库下载到某些厂牌官网的头像，请填写其厂牌名。多个厂牌请使用中文顿号（、）分隔。
-Black_List = 无
-
-### 多头像下载方式 ###
-# 仓库内可能存储了一位女友的多张头像，遇到这种情况默认选择最优的一张。或者您也可以让程序把对应头像全部下载，并在导入前提醒您手动挑选。
-# 0 - 自动优选
-# 1 - 手动挑选（当有大量头像需要导入时，谨慎选择）
 
 [导入设置]
 ### 本地头像文件夹 ###
@@ -510,15 +502,36 @@ def check_update():
         if response.status_code != 200:
             print('× 检查更新失败！返回了一个错误： {}\n'.format(response.status_code))
             rewriteable_word('按任意键跳过...')
-            os.system('pause>nul') if WINOS else input('按任意键跳过...')
-        if version.replace('v', '') < loads(response.text)[0]['tag_name'].replace('v', ''):
-            print(loads(response.text)[0]['tag_name'] + ' 新版本发布啦！\n')
-            # print(re.search('What\'s New?.*?(?=\r\n<details>)',loads(response.text)[0]['body'],flags = re.S).group(0).replace('*',''))
-            print('请通过如下链接下载更新：\nhttps://git.io/JL0tk\n')
+            os.system('pause>nul') if WINOS else input('Press Enter to skip...')
+
+        # version process
+        # `v2.94` > `2.94`
+        # `v3.0.0` > `3.0.0` > `0.0.3` > `00.3` > `3.00`
+        local_ver = version.replace('v', '')[::-1].replace('.','',1)[::-1]
+        remote_ver = loads(response.text)[0]['tag_name'].replace('v', '')
+        if remote_ver.count('.') > 1:
+            remote_ver = remote_ver[::-1].replace('.', '', 1)[::-1]
+
+        if float(local_ver) < float(remote_ver):
+            print(loads(response.text)[0]['name'] + ' 发布啦！\n')
+            print(loads(response.text)[0]['body'])
+            print('了解详情：https://git.io/JL0tk')
+            print('或通过如下链接下载：')
+            for item in loads(response.text)[0]['assets']:
+                if sys.platform.startswith('win') and ('windows' in item['browser_download_url'] or 'Windows' in item['browser_download_url']):
+                    print(item['browser_download_url'])
+                    break
+                if sys.platform.startswith('darwin') and ('macos' in item['browser_download_url'] or 'macOS' in item['browser_download_url']):
+                    print(item['browser_download_url'])
+                    break
+                if sys.platform.startswith('linux') and ('ubuntu' in item['browser_download_url'] or 'Linux' in item['browser_download_url']):
+                    print(item['browser_download_url'])
+                    break
+            print('')
             rewriteable_word('按任意键跳过更新...')
-            os.system('pause>nul') if WINOS else input('按任意键跳过更新...')
+            os.system('pause>nul') if WINOS else input('Press Enter to skip...')
             print('即将跳过更新。不推荐跳过更新，如遇问题请及时更新。')
-            time.sleep(5)
+            time.sleep(3)
     except requests.exceptions.ConnectTimeout:
         print('× 检查更新超时，网络连接不稳定！\n')
         print('即将跳过更新。')
@@ -527,7 +540,7 @@ def check_update():
         if debug: print(format_exc())
         print('× 检查更新失败！\n')
         rewriteable_word('按任意键跳过...')
-        os.system('pause>nul') if WINOS else input('按任意键跳过更新...')
+        os.system('pause>nul') if WINOS else input('Press Enter to skip...')
     if WINOS and not quiet_flag: os.system('cls')
 
 
@@ -543,7 +556,7 @@ else:
 (config_file, quiet_flag) = argparse_function(version)
 if quiet_flag: sys.stdout = open("./Getter/quiet.log", "w", buffering=1)
 (repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy, aifix, debug, deleteall,
- download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP, Black_List) = read_config(
+ download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP) = read_config(
     config_file)
 
 # 持久会话
