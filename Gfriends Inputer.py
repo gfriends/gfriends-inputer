@@ -73,38 +73,71 @@ def fix_size(type, path):
 
 def get_gfriends_map(repository_url):
     rewriteable_word('>> 连接 Gfriends 女友头像仓库...')
+
+    # 定义变量
     if repository_url == '默认/': repository_url = 'https://raw.githubusercontent.com/gfriends/gfriends/master/'
     gfriends_template = repository_url + '{}/{}/{}'
     filetree_url = repository_url + 'Filetree.json'
-    try:
+
+    # 检查文件树缓存
+    keep_tree = False
+    if os.path.exists('./Getter/Filetree.json'):
+        # 加 deflate 请求以防压缩无法获取真实大小
         if Proxy_Range in ['NO', 'HOST']:
-            response = session.get(filetree_url, timeout=15)
+            gfriends_response = session.head(filetree_url, timeout=1, headers={'Accept-Encoding':'deflate'})
         else:
-            response = session.get(filetree_url, proxies=proxies, timeout=15)
-        # 修复部分服务端返回 header 未指明编码使后续解析错误
-        response.encoding = 'utf-8'
-    except requests.exceptions.RequestException:
-        print('× 连接 Gfriends 女友头像仓库超时，请检查网络连接\n')
-        sys.exit()
-    except:
-        if debug: print(format_exc())
-        print('× 网络连接异常且重试 ' + str(max_retries) + ' 次失败')
-        print('× 请尝试开启全局代理或配置 HTTP 局部代理；若已开启代理，请检查其可用性')
-        sys.exit()
-    if response.status_code != 200:
-        print('× 女友仓库返回了一个错误：' + str(response.status_code))
-        sys.exit()
-    if aifix:
-        map_json = loads(response.text)
+            gfriends_response = session.head(filetree_url, proxies=proxies, timeout=1, headers={'Accept-Encoding':'deflate'})
+        if os.path.getsize('./Getter/Filetree.json') == int(gfriends_response.headers['Content-Length']):
+            keep_tree = True
+
+    if keep_tree:
+        with open('./Getter/Filetree.json', 'r', encoding='utf-8') as json_file:
+            if aifix:
+                map_json = loads(json_file.read())
+            else:
+                map_json = loads(json_file.read().replace('AI-Fix-', ''))
+        print('√ 使用 Gfriends 女友头像仓库缓存')
     else:
-        map_json = loads(response.text.replace('AI-Fix-', ''))
+        try:
+            if Proxy_Range in ['NO', 'HOST']:
+                response = session.get(filetree_url, timeout=15)
+            else:
+                response = session.get(filetree_url, proxies=proxies, timeout=15)
+            # 修复部分服务端返回 header 未指明编码使后续解析错误
+            response.encoding = 'utf-8'
+        except requests.exceptions.RequestException:
+            print('× 连接 Gfriends 女友头像仓库超时，请检查网络连接\n')
+            sys.exit()
+        except:
+            if debug: print(format_exc())
+            print('× 网络连接异常且重试 ' + str(max_retries) + ' 次失败')
+            print('× 请尝试开启全局代理或配置 HTTP 局部代理；若已开启代理，请检查其可用性')
+            sys.exit()
+        if response.status_code == 429:
+            print('× 女友仓库返回了一个错误：429 请求过于频繁，请稍后再试')
+            sys.exit()
+        elif response.status_code != 200:
+            print('× 女友仓库返回了一个错误：' + str(response.status_code))
+            sys.exit()
+
+        # 应用 AI 修复
+        if aifix:
+            map_json = loads(response.text)
+        else:
+            map_json = loads(response.text.replace('AI-Fix-', ''))
+
+        # 写入文件树缓存
+        with open('./Getter/Filetree.json', "wb") as json_file:
+            json_file.write(response.content)
+        print('√ 连接 Gfriends 女友头像仓库成功')
+
+    # 生成下载地址字典
     output = {}
     for second in map_json['Content'].keys():
         for k, v in map_json['Content'][second].items():
             secondstr = re.sub(".*-", "", second)
             if not secondstr in Black_List:
                 output[k[:-4]] = gfriends_template.format('Content', second, v)
-    print('√ 连接 Gfriends 女友头像仓库成功')
     print('   库存头像：' + str(map_json['Information']['TotalNum']) + '枚\n')
     return output
 
@@ -146,6 +179,9 @@ def download_avatar(url, actor_name, proc_md5):
     else:
         gfriends_response = session.get(url, proxies=proxies)
     pic_path = download_path + actor_name + ".jpg"
+    if gfriends_response.status_code == 429:
+        print('!! ' + pic_path + ' 下载失败，女友仓库返回：429 请求过快，请稍后再试')
+        return False
     try:
         Image.open(io.BytesIO(gfriends_response.content)).verify()  # 校验下载的图片
     except:
