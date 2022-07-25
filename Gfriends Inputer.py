@@ -288,8 +288,6 @@ def read_config(config_file):
                 os.makedirs(local_path)
                 write_txt(local_path + "/README.txt",
                           '本目录自动生成，您可以存放自己收集的头像，这些头像将被优先导入服务器。\n\n请自行备份您收集头像的副本，根据个人配置不同，该目录文件可能会被程序修改。\n\n仅支持JPG格式，且请勿再创建子目录。\n\n如果您收集的头像位于子目录，可通过 Move To Here.bat（Only for Windows） 工具将其全部提取到根目录。')
-                write_txt(local_path + "/Move To Here.bat",
-                          '@echo off\necho This tool will help you move all files which in the subdirectory to this root directory\npause\nfor /f "delims=" %%a in ("dir /a-d /b /s ") do (\nmove "%%~a" ./ 2>nul\n)\n')
             # 定义百度AI
             if fixsize == '3':
                 BD_AI_client = AipBodyAnalysis(BD_App_ID, BD_API_Key, BD_Secret_Key)
@@ -348,7 +346,7 @@ Proxy =
 
 [导入设置]
 ### 本地头像文件夹 ###
-# 将第三方头像包或自己收集的头像移动至该目录，可优先于仓库导入服务器。仅支持非子目录下的 jpg 格式。
+# 将第三方头像包或自己收集的头像移动至该目录，可优先于仓库导入服务器。仅支持 jpg 格式。
 Local_Path = ./Avatar/
 
 ### 头像导入方式（仅支持官方仓库） ###
@@ -751,16 +749,18 @@ try:
                     pic_path_dict[filename] = download_path + filename
             else:
                 pic_path_dict[filename] = download_path + filename
-    for filename in os.listdir(local_path):
-        if '.jpg' in filename and filename.replace('.jpg', '') in actor_dict:
-            if overwrite == '2' and filename.replace('.jpg', '') in exist_list:  # 覆盖导入且现在头像不存在
-                actor_md5 = md5(filename.replace('.jpg', '').encode('UTF-8')).hexdigest()[12:-12]
-                if actor_md5 not in inputed_dict or inputed_dict[actor_md5] != str(
-                        os.path.getsize(local_path + filename)):
-                    pic_path_dict[filename] = local_path + filename
-                inputed_dict[actor_md5] = str(os.path.getsize(local_path + filename))
-            else:
-                pic_path_dict[filename] = local_path + filename
+    for root, dirs, files in os.walk(local_path):
+        for filename in files:
+            file_path = os.path.join(root,filename)
+            if '.jpg' in filename and filename.replace('.jpg', '') in actor_dict:
+                if overwrite == '2' and filename.replace('.jpg', '') in exist_list:  # 覆盖导入且现在头像不存在
+                    actor_md5 = md5(filename.replace('.jpg', '').encode('UTF-8')).hexdigest()[12:-12]
+                    file_size = str(os.path.getsize(file_path))
+                    if actor_md5 not in inputed_dict or inputed_dict[actor_md5] != file_size:
+                        pic_path_dict[filename] = file_path
+                    inputed_dict[actor_md5] = file_size
+                else:
+                    pic_path_dict[filename] = file_path
 
     if not pic_path_dict:
         proc_log.close()
