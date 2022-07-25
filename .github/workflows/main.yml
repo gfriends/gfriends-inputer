@@ -25,20 +25,18 @@ jobs:
       with:
         python-version: 3.9
 
-    - name: Install dependencies
+    - name: Install dependencies & Copy library
       run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
+          mkdir -p ./dist/Lib/
+          cp ./Lib/opencv_face_detector_uint8.pb ./dist/Lib/
+          cp ./Lib/opencv_face_detector.pbtxt ./dist/Lib/
 
     - name: Build For Windows/Mac/Linux
       run: |
-        pyinstaller -F 'Gfriends Inputer.py' --collect-all grapheme
-
-    - name: Copy library
-      run: |
-          cp ./Lib/opencv_face_detector_uint8.pb ./dist/Lib/opencv_face_detector_uint8.pb
-          cp ./Lib/opencv_face_detector.pbtxt ./dist/Lib/opencv_face_detector.pbtxt
+          pyinstaller -F 'Gfriends Inputer.py' --collect-all grapheme
 
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v1
