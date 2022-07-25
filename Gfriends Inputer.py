@@ -15,6 +15,7 @@ from json import loads
 from PIL import Image, ImageFilter
 from aip import AipBodyAnalysis
 
+
 def fix_size(type, path):
     try:
         pic = Image.open(path)
@@ -35,7 +36,8 @@ def fix_size(type, path):
                         x_nose, y_nose = find_faces(path)  # 传递二进制RGB图像，返回鼻子横、纵坐标
                     else:
                         with open(path, 'rb') as fp:
-                            x_nose = int(BD_AI_client.bodyAnalysis(fp.read())["person_info"][0]['body_parts']['nose']['x'])  # 返回鼻子横坐标
+                            x_nose = int(BD_AI_client.bodyAnalysis(fp.read())["person_info"][0]['body_parts']['nose'][
+                                             'x'])  # 返回鼻子横坐标
                         if BD_VIP == '否':
                             time.sleep(0.2)  # 免费用户QPS≈2，排除网络延迟及性能损耗时间，此值可以稍降低
                         else:
@@ -85,7 +87,8 @@ def get_gfriends_map(repository_url):
     keep_tree = False
     if os.path.exists('./Getter/Filetree.json'):
         # 加 deflate 请求以防压缩无法获取真实大小
-        gfriends_response = session.head(filetree_url, proxies=proxies, timeout=1, headers={'Accept-Encoding':'deflate'})
+        gfriends_response = session.head(filetree_url, proxies=proxies, timeout=1,
+                                         headers={'Accept-Encoding': 'deflate'})
         if os.path.getsize('./Getter/Filetree.json') == int(gfriends_response.headers['Content-Length']):
             keep_tree = True
 
@@ -140,6 +143,7 @@ def asyncc(f):
     def wrapper(*args, **kwargs):
         thr = threading.Thread(target=f, args=args, kwargs=kwargs)
         thr.start()
+
     return wrapper
 
 
@@ -185,8 +189,8 @@ def download_avatar(url, actor_name, proc_md5):
 def input_avatar(url, data):
     try:
         session.post(url, data=data, headers={"Content-Type": 'image/jpeg',
-                                                  "User-Agent": 'Gfriends_Inputer/' + version.replace('v', '')},
-                         proxies=proxies)
+                                              "User-Agent": 'Gfriends_Inputer/' + version.replace('v', '')},
+                     proxies=proxies)
     except:
         print('!! ' + url.replace(host_url, '').replace(api_key, '***') + ' 导入失败，可能是与媒体服务器连接不稳定，请尝试降低导入线程数。')
 
@@ -293,8 +297,8 @@ def read_config(config_file):
             else:
                 BD_AI_client = None
             return (
-            repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy, aifix, debug,
-            deleteall, download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP)
+                repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy, aifix, debug,
+                deleteall, download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP)
         except:
             print(format_exc())
             print('× 无法读取 config.ini。如果这是旧版本的配置文件，请删除后重试。\n')
@@ -400,8 +404,8 @@ def read_persons(host_url, api_key, emby_flag):
         host_url_persons = host_url + 'jellyfin/Persons?api_key=' + api_key  # &PersonTypes=Actor
     try:
         rqs_emby = session.get(url=host_url_persons,
-                                   headers={"User-Agent": 'Gfriends_Inputer/' + version.replace('v', '')},
-                                   proxies=proxies, timeout=5)
+                               headers={"User-Agent": 'Gfriends_Inputer/' + version.replace('v', '')},
+                               proxies=proxies, timeout=5)
     except requests.exceptions.ConnectionError:
         print('× 连接 Emby / Jellyfin 服务器失败，请检查地址是否正确：', host_url, '\n')
         sys.exit()
@@ -454,7 +458,7 @@ def del_all():
     os.system('pause>nul') if WINOS else input('Press Enter to start...')
     with alive_bar(len(list_persons), enrich_print=False, dual_line=True) as bar:
         for dic_each_actor in list_persons:
-            bar.text('正在删除：'+dic_each_actor['Name'])
+            bar.text('正在删除：' + dic_each_actor['Name'])
             bar()
             if dic_each_actor['ImageTags']:
                 if emby_flag:
@@ -475,6 +479,7 @@ def del_all():
     print('√ 删除完成')
     if WINOS: print('按任意键退出程序...'); os.system('pause>nul')
     sys.exit()
+
 
 @asyncc
 def get_ip():
@@ -497,7 +502,7 @@ def check_update():
     try:
         get_ip()
         response = session.get('https://api.github.com/repos/gfriends/gfriends-inputer/releases', proxies=proxies,
-                                   timeout=3)
+                               timeout=3)
         response.encoding = 'utf-8'
         if response.status_code != 200:
             print('× 检查更新失败！返回了一个错误： {}\n'.format(response.status_code))
@@ -507,7 +512,7 @@ def check_update():
         # version process
         # `v2.94` > `2.94`
         # `v3.0.0` > `3.0.0` > `0.0.3` > `00.3` > `3.00`
-        local_ver = version.replace('v', '')[::-1].replace('.','',1)[::-1]
+        local_ver = version.replace('v', '')[::-1].replace('.', '', 1)[::-1]
         remote_ver = loads(response.text)[0]['tag_name'].replace('v', '')
         if remote_ver.count('.') > 1:
             remote_ver = remote_ver[::-1].replace('.', '', 1)[::-1]
@@ -518,13 +523,16 @@ def check_update():
             print('了解详情：https://git.io/JL0tk')
             print('或通过如下链接下载：')
             for item in loads(response.text)[0]['assets']:
-                if sys.platform.startswith('win') and ('windows' in item['browser_download_url'] or 'Windows' in item['browser_download_url']):
+                if sys.platform.startswith('win') and (
+                        'windows' in item['browser_download_url'] or 'Windows' in item['browser_download_url']):
                     print(item['browser_download_url'])
                     break
-                if sys.platform.startswith('darwin') and ('macos' in item['browser_download_url'] or 'macOS' in item['browser_download_url']):
+                if sys.platform.startswith('darwin') and (
+                        'macos' in item['browser_download_url'] or 'macOS' in item['browser_download_url']):
                     print(item['browser_download_url'])
                     break
-                if sys.platform.startswith('linux') and ('ubuntu' in item['browser_download_url'] or 'Linux' in item['browser_download_url']):
+                if sys.platform.startswith('linux') and (
+                        'ubuntu' in item['browser_download_url'] or 'Linux' in item['browser_download_url']):
                     print(item['browser_download_url'])
                     break
             print('')
@@ -705,7 +713,8 @@ try:
         with alive_bar(len(link_dict), enrich_print=False, dual_line=True) as bar:
             for actor_name, link in link_dict.items():
                 try:
-                    bar.text('正在下载：'+re.sub(r'（.*）', '', actor_name)) if '（' in actor_name else bar.text('正在下载：'+actor_name)
+                    bar.text('正在下载：' + re.sub(r'（.*）', '', actor_name)) if '（' in actor_name else bar.text(
+                        '正在下载：' + actor_name)
                     bar()
                     proc_md5 = md5((actor_name + '+1').encode('UTF-8')).hexdigest()[13:-13]
                     if not proc_flag or (proc_flag and not proc_md5 in proc_list):
@@ -772,7 +781,8 @@ try:
         print('\n>> 尺寸优化...')
         with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
             for filename, pic_path in pic_path_dict.items():
-                bar.text('正在优化：'+re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text('正在优化：'+
+                bar.text('正在优化：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
+                    '正在优化：' +
                     filename.replace('.jpg', ''))
                 bar()
                 proc_md5 = md5((filename + '+2').encode('UTF-8')).hexdigest()[13:-13]
@@ -785,7 +795,8 @@ try:
     print('\n>> 导入头像...')
     with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
         for filename, pic_path in pic_path_dict.items():
-            bar.text('正在导入：'+re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text('正在导入：'+
+            bar.text('正在导入：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
+                '正在导入：' +
                 filename.replace('.jpg', ''))
             bar()
             proc_md5 = md5((filename + '+3').encode('UTF-8')).hexdigest()[13:-13]
