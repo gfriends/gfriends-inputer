@@ -1,15 +1,24 @@
-import os
+import os, logging
 import cv2
 import numpy as np
 from PIL import Image
+from traceback import format_exc
 
-# Load a model stored in Caffe
-# opencv_dnn_model = cv2.dnn.readNetFromCaffe("./Lib/deploy.prototxt",
-#                                              "./Lib/res10_300x300_ssd_iter_140000_fp16.caffemodel")
+logger = logging.getLogger()
+try:
+    # Load a model stored in Caffe
+    # opencv_dnn_model = cv2.dnn.readNetFromCaffe("./Lib/deploy.prototxt",
+    #                                              "./Lib/res10_300x300_ssd_iter_140000_fp16.caffemodel")
 
-# Load a model stored in TensorFlow
-opencv_dnn_model = cv2.dnn.readNetFromTensorflow("./Lib/opencv_face_detector_uint8.pb",
-                                                "./Lib/opencv_face_detector.pbtxt")
+    # Load a model stored in TensorFlow
+    opencv_dnn_model = cv2.dnn.readNetFromTensorflow("./Lib/opencv_face_detector_uint8.pb",
+                                                    "./Lib/opencv_face_detector.pbtxt")
+    logger.info('OpenCV 初始化成功')
+except cv2.error:
+    logger.warning('OpenCV 初始化失败：' + format_exc().replace('\n',''))
+    print('OpenCV 初始化失败，这通常是由于文件缺失导致的，继续运行则可能引发异常。')
+    print('请重新下载程序，或关闭本地AI功能。')
+    input('Press Enter to continue...')
 
 def find_faces(img):
     # 传递路径：等效于 cv2.imread，但增加了支持中文名支持，仅支持 RGB 图像；np.fromfile 读取为数组，cv2.imdecode 解码为图像
