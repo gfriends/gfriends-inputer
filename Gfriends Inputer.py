@@ -16,23 +16,24 @@ from lxml import etree
 from PIL import Image, ImageFilter
 from aip import AipBodyAnalysis
 
+
 def fix_size(type, path):
     try:
         pic = Image.open(path)
         if pic.mode != "RGB": pic = pic.convert('RGB')  # 有些图片有P通道，base64编码后会出问题
         (wf, hf) = pic.size
         if not 2 / 3 - 0.02 <= wf / hf <= 2 / 3 + 0.02:  # 仅处理会过度拉伸的图片
-            if type == '1':
+            if type == 1:
                 fixed_pic = pic.resize((int(wf), int(3 / 2 * wf)))  # 拉伸图片
                 fixed_pic = fixed_pic.filter(ImageFilter.GaussianBlur(radius=50))  # 高斯平滑滤镜
                 fixed_pic.paste(pic, (0, int((3 / 2 * wf - hf) / 2)))  # 粘贴原图
                 fixed_pic.save(path, quality=95)
-            elif type == '2':
+            elif type == 2:
                 fixed_pic = pic.crop((int(wf / 2 - 1 / 3 * hf), 0, int(wf / 2 + 1 / 3 * hf), int(hf)))  # 像素中线向两边扩展
                 fixed_pic.save(path, quality=95)
-            elif type == '3' or type == '4':
+            elif type == 3 or type == 4:
                 try:
-                    if type == '3':
+                    if type == 3:
                         x_nose, y_nose = find_faces(pic)  # 传递二进制RGB图像，返回鼻子横、纵坐标
                     else:
                         with open(path, 'rb') as fp:
@@ -75,6 +76,7 @@ def fix_size(type, path):
         os.rename(path, failed_path)
         return False
 
+
 def xslist_search(id, name):
     try:
         # 搜索
@@ -89,22 +91,23 @@ def xslist_search(id, name):
         detial_list = html.xpath('/html/body/div[1]/div[3]/div/p[1]/descendant-or-self::text()')
         detial_info = ''
         for info in detial_list:
-            info = info.replace(' ','',1) # 删掉多余空格
+            info = info.replace(' ', '', 1)  # 删掉多余空格
             if '身高' in info or '国籍' in info:
                 detial_info += info
             else:
                 detial_info += info + '<br>'
 
         # 重组请求json
-        detial_json =  {'Name': name,
-         'ProviderIds': 'XSlist got by gfriends:'+detial_url,
-         'Taglines': ['日本AV女优'],
-         'Overview': detial_info}
+        detial_json = {'Name': name,
+                       'ProviderIds': 'XSlist got by gfriends:' + detial_url,
+                       'Taglines': ['日本AV女优'],
+                       'Overview': detial_info}
 
         url_post = host_url + 'emby/Items/' + id + '?api_key=' + api_key
-        response = session.post(url_post,json = detial_json, proxies=proxies)
+        response = session.post(url_post, json=detial_json, proxies=proxies)
     except:
         return
+
 
 def get_gfriends_map(repository_url):
     rewriteable_word('>> 连接 Gfriends 女友头像仓库...')
@@ -164,11 +167,11 @@ def get_gfriends_map(repository_url):
     # 生成下载地址字典
     output = {}
 
-    if Conflict_Proc == "1":
+    if Conflict_Proc == 1:
         # 允许多头像，则多下载地址用列表存储，否则存储单字符串。
         for second in map_json['Content'].keys():
             for k, v in map_json['Content'][second].items():
-                #print(second,k, v)
+                # print(second,k, v)
                 if k[:-4] in output:
                     output[k[:-4]].append(gfriends_template.format('Content', second, v))
                 else:
@@ -292,19 +295,19 @@ def read_config(config_file):
             max_retries = config_settings.getint("下载设置", "MAX_Retry")
             Proxy = config_settings.get("下载设置", "Proxy")
             download_path = config_settings.get("下载设置", "Download_Path")
-            Conflict_Proc = config_settings.get("下载设置", "Conflict_Proc")
+            Conflict_Proc = config_settings.getint("下载设置", "Conflict_Proc")
             max_upload_connect = config_settings.getint("导入设置", "MAX_UL")
-            Get_Intro = config_settings.get("导入设置", "Get_Intro")
+            Get_Intro = config_settings.getint("导入设置", "Get_Intro")
             local_path = config_settings.get("导入设置", "Local_Path")
             BD_App_ID = config_settings.get("导入设置", "BD_App_ID")
             BD_API_Key = config_settings.get("导入设置", "BD_API_Key")
             BD_Secret_Key = config_settings.get("导入设置", "BD_Secret_Key")
             BD_VIP = config_settings.get("导入设置", "BD_VIP")
-            overwrite = config_settings.get("导入设置", "OverWrite")
+            overwrite = config_settings.getint("导入设置", "OverWrite")
             aifix = True if config_settings.get("下载设置", "AI_Fix") == '是' else False
             debug = True if config_settings.get("调试功能", "DeBug") == '是' else False
             deleteall = True if config_settings.get("调试功能", "DEL_ALL") == '是' else False
-            fixsize = config_settings.get("导入设置", "Size_Fix")
+            fixsize = config_settings.getint("导入设置", "Size_Fix")
             '''
             # 弃用代理选项
             if Proxy_Range not in ['ALL', 'REPO', 'HOST', 'NO']:
@@ -352,13 +355,14 @@ def read_config(config_file):
                 write_txt(local_path + "/README.txt",
                           '本目录自动生成，您可以存放自己收集的头像，这些头像将被优先导入服务器。\n\n请自行备份您收集头像的副本，根据个人配置不同，该目录文件可能会被程序修改。\n\n仅支持JPG格式，且请勿再创建子目录。\n\n如果您收集的头像位于子目录，可通过 Move To Here.bat（Only for Windows） 工具将其全部提取到根目录。')
             # 定义百度AI
-            if fixsize == '3':
+            if fixsize == 3:
                 BD_AI_client = AipBodyAnalysis(BD_App_ID, BD_API_Key, BD_Secret_Key)
             else:
                 BD_AI_client = None
             return (
                 repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy, aifix, debug,
-                deleteall, download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP, Get_Intro, Conflict_Proc)
+                deleteall, download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP,
+                Get_Intro, Conflict_Proc)
         except:
             print(format_exc())
             print('× 无法读取 config.ini。如果这是旧版本的配置文件，请删除后重试。\n')
@@ -632,7 +636,8 @@ else:
 (config_file, quiet_flag) = argparse_function(version)
 if quiet_flag: sys.stdout = open("./Getter/quiet.log", "w", buffering=1)
 (repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy, aifix, debug, deleteall,
- download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP, Get_Intro, Conflict_Proc) = read_config(
+ download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP, Get_Intro,
+ Conflict_Proc) = read_config(
     config_file)
 
 # 持久会话
@@ -685,7 +690,7 @@ else:
 
 try:
     (list_persons, emby_flag) = read_persons(host_url, api_key, True)
-    list_persons = [{'Name': '@YOU', 'ServerId': 'be208b8f79ed449aacf99a1a23530488', 'Id': '59932', 'Type': 'Person', 'ImageTags': {'Primary': '3ad658cbfb0173e14bb09d255e84d64a'}, 'BackdropImageTags': []}]
+    # list_persons = [{'Name': '@YOU', 'ServerId': 'be208b8f79ed449aacf99a1a23530488', 'Id': '59932', 'Type': 'Person', 'ImageTags': {'Primary': '3ad658cbfb0173e14bb09d255e84d64a'}, 'BackdropImageTags': []}]
     gfriends_map = get_gfriends_map(repository_url)
     actor_log = open('./Getter/演员清单.txt', 'w', encoding="UTF-8", buffering=1)
     actor_log.write('【演员清单】\n该清单仅供参考，下面可能还有导演、编剧、赞助商等其他人的名字，但是女友头像仓库只会收录日本女友。\n而已匹配到的头像则会根据个人配置，下载导入或会跳过\n\n')
@@ -707,7 +712,7 @@ try:
         if dic_each_actor['ImageTags']:
             num_exist += 1
             exist_list.append(actor_name)
-            if overwrite == '0':
+            if not overwrite:
                 actor_log.write('跳过：' + actor_name + '\n')
                 num_skip += 1
                 continue
@@ -730,7 +735,7 @@ try:
         actor_dict[actor_name] = actor_id
     actor_log.close()
 
-    if overwrite == '2' and Conflict_Proc == "0":
+    if overwrite == 2 and not Conflict_Proc:
         md5_host_url = md5(host_url.encode('UTF-8')).hexdigest()[14:-14]
         if os.path.exists('./Getter/down' + md5_host_url + '.log'):  # 有下载记录，则逐行读取记录
             with open('./Getter/down' + md5_host_url + '.log', 'r', encoding='UTF-8') as file:
@@ -813,7 +818,7 @@ try:
                 continue
         print('√ 下载完成')
 
-    if Conflict_Proc == "1":
+    if Conflict_Proc == 1:
         print('\n您已在配置文件中开启多头像的”手动挑选“')
         print('请检查下载目录，删除不喜欢的头像')
         print('\n1. 每位女友最好只保留一张头像，否则程序会自动选一张较好的')
@@ -828,18 +833,18 @@ try:
             actorname = filename.replace('.jpg', '')
             actorname = re.sub(r'\-\d+', '', actorname)
             if '.jpg' in filename and actorname in actor_dict and actorname not in temp_list:
-                pic_path_dict[filename] = os.path.join(download_path,filename)
+                pic_path_dict[filename] = os.path.join(download_path, filename)
                 temp_list.append(actorname)
             else:
                 # 删除多余的头像
-                os.remove(os.path.join(download_path,filename))
+                os.remove(os.path.join(download_path, filename))
         del temp_list
     else:
         # 构建路径映射
         for filename in os.listdir(download_path):
             actorname = filename.replace('.jpg', '')
             if '.jpg' in filename and actorname in actor_dict:
-                if overwrite == '2':
+                if overwrite == 2:
                     if actorname in link_dict:  # link_dict 已经初始化筛选，key 为需要导入的演员名
                         pic_path_dict[filename] = download_path + filename
                 else:
@@ -847,9 +852,9 @@ try:
     for root, dirs, files in os.walk(local_path):
         for filename in files:
             actorname = filename.replace('.jpg', '')
-            file_path = os.path.join(root,filename)
+            file_path = os.path.join(root, filename)
             if '.jpg' in filename and actorname in actor_dict:
-                if overwrite == '2' and actorname in exist_list:  # 覆盖导入且现在头像不存在
+                if overwrite == 2 and actorname in exist_list:  # 覆盖导入且现在头像不存在
                     actor_md5 = md5(actorname.encode('UTF-8')).hexdigest()[12:-12]
                     file_size = str(os.path.getsize(file_path))
                     if actor_md5 not in inputed_dict or inputed_dict[actor_md5] != file_size:
@@ -861,7 +866,7 @@ try:
     if not pic_path_dict:
         proc_log.close()
         os.remove('./Getter/proc.tmp')
-        if overwrite == '2' and Conflict_Proc == "0":
+        if overwrite == 2 and not Conflict_Proc:
             down_log = open('./Getter/down' + md5_host_url + '.log', 'w', encoding="UTF-8")
             down_log.write(
                 '## Gfriends Inputer 导入记录 ##\n## 请注意：删除本文件会导致服务器 ' + host_url + ' 的增量更新功能重置\n' + md5_config + '\n')
@@ -872,7 +877,7 @@ try:
         if WINOS and not quiet_flag: print('\n按任意键退出程序...'); os.system('pause>nul')
         os._exit(1)
 
-    if fixsize != '0':
+    if fixsize:
         print('\n>> 尺寸优化...')
         with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
             for filename, pic_path in pic_path_dict.items():
@@ -891,7 +896,7 @@ try:
     with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
         for filename, pic_path in pic_path_dict.items():
             actorname = filename.replace('.jpg', '')
-            actorname = re.sub(r'\-\d+', '', actorname)
+            actorname = re.sub(r'1\-\d+', '', actorname)
             bar.text('正在导入：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
                 '正在导入：' + actorname)
             bar()
@@ -900,11 +905,13 @@ try:
                 with open(pic_path, 'rb') as pic_bit:
                     b6_pic = b64encode(pic_bit.read())
                 if emby_flag:
-                    url_post_img = host_url + 'emby/Items/' + actor_dict[actorname] + '/Images/Primary?api_key=' + api_key
+                    url_post_img = host_url + 'emby/Items/' + actor_dict[
+                        actorname] + '/Images/Primary?api_key=' + api_key
                 else:
-                    url_post_img = host_url + 'jellyfin/Items/' + actor_dict[actorname] + '/Images/Primary?api_key=' + api_key
+                    url_post_img = host_url + 'jellyfin/Items/' + actor_dict[
+                        actorname] + '/Images/Primary?api_key=' + api_key
                 input_avatar(url_post_img, b6_pic)
-                if Get_Intro == "1":
+                if Get_Intro == 1:
                     xslist_search(actor_dict[actorname], actorname)
                     bar.text(
                         '搜索信息：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
@@ -924,7 +931,7 @@ try:
             continue
     proc_log.close()
     os.remove('./Getter/proc.tmp')
-    if overwrite == '2' and Conflict_Proc == "0":
+    if overwrite == 2 and not Conflict_Proc:
         down_log = open('./Getter/down' + md5_host_url + '.log', 'w', encoding="UTF-8")
         down_log.write(
             '## Gfriends Inputer 导入记录 ##\n## 请注意：删除本文件会导致服务器 ' + host_url + ' 的增量更新功能重置\n' + md5_config + '\n')
@@ -934,7 +941,7 @@ try:
     print('√ 导入完成')
     print('\nEmby / Jellyfin 演职人员共 ' + str(len(list_persons)) + ' 人，其中 ' + str(num_exist) + ' 人之前已有头像')
     print('本次导入 ' + str(num_suc) + ' 人，还有 ' + str(num_fail) + ' 人没有头像\n')
-    if overwrite == '0': print('-- 未开启覆盖已有头像，所以跳过了一些演员，详见 Getter 目录下的记录清单')
+    if not overwrite: print('-- 未开启覆盖已有头像，所以跳过了一些演员，详见 Getter 目录下的记录清单')
 except (KeyboardInterrupt, SystemExit):
     print('× 用户强制停止或已知错误。')
 except:
