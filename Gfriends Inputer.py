@@ -33,7 +33,7 @@ def fix_size(type, path):
             elif type == '3' or type == '4':
                 try:
                     if type == '3':
-                        x_nose, y_nose = find_faces(path)  # 传递二进制RGB图像，返回鼻子横、纵坐标
+                        x_nose, y_nose = find_faces(pic)  # 传递二进制RGB图像，返回鼻子横、纵坐标
                     else:
                         with open(path, 'rb') as fp:
                             x_nose = int(BD_AI_client.bodyAnalysis(fp.read())["person_info"][0]['body_parts']['nose'][
@@ -53,6 +53,7 @@ def fix_size(type, path):
                 except KeyboardInterrupt:
                     sys.exit()
                 except:
+                    if debug: print(format_exc())
                     print('!! ' + path + ' AI 分析失败，跳过 AI 直接裁剪')
                     fix_size('2', path)
             else:
@@ -104,7 +105,6 @@ def xslist_search(id, name):
         response = session.post(url_post,json = detial_json, proxies=proxies)
     except:
         return
-
 
 def get_gfriends_map(repository_url):
     rewriteable_word('>> 连接 Gfriends 女友头像仓库...')
@@ -163,9 +163,21 @@ def get_gfriends_map(repository_url):
 
     # 生成下载地址字典
     output = {}
-    for second in map_json['Content'].keys():
-        for k, v in map_json['Content'][second].items():
-            output[k[:-4]] = gfriends_template.format('Content', second, v)
+
+    if Conflict_Proc == "1":
+        # 允许多头像，则多下载地址用列表存储，否则存储单字符串。
+        for second in map_json['Content'].keys():
+            for k, v in map_json['Content'][second].items():
+                #print(second,k, v)
+                if k[:-4] in output:
+                    output[k[:-4]].append(gfriends_template.format('Content', second, v))
+                else:
+                    output[k[:-4]] = [gfriends_template.format('Content', second, v)]
+    else:
+        for second in map_json['Content'].keys():
+            for k, v in map_json['Content'][second].items():
+                output[k[:-4]] = gfriends_template.format('Content', second, v)
+
     print('   库存头像：' + str(map_json['Information']['TotalNum']) + '枚\n')
     return output
 
@@ -200,20 +212,37 @@ def check_avatar(url, actor_name, proc_md5):
 
 @asyncc
 def download_avatar(url, actor_name, proc_md5):
-    gfriends_response = session.get(url, proxies=proxies)
-    pic_path = download_path + actor_name + ".jpg"
-    if gfriends_response.status_code == 429:
-        print('!! ' + pic_path + ' 下载失败，女友仓库返回：429 请求过快，请稍后再试')
-        return False
-    try:
-        Image.open(io.BytesIO(gfriends_response.content)).verify()  # 校验下载的图片
-    except:
-        print('!! ' + pic_path + ' 校验失败，可能下载的头像不完整。')
-    with open(pic_path, "wb") as code:
-        code.write(gfriends_response.content)
-    actor_md5 = md5(actor_name.encode('UTF-8')).hexdigest()[12:-12]
-    inputed_dict[actor_md5] = gfriends_response.headers['Content-Length']  # 写入图片版本日志
-    proc_log.write(proc_md5 + '\n')
+    if type(url) == list:
+        urls = url
+        i = 1
+        for url in urls:
+            gfriends_response = session.get(url, proxies=proxies)
+            pic_path = download_path + actor_name + "-" + str(i) + ".jpg"
+            if gfriends_response.status_code == 429:
+                print('!! ' + pic_path + ' 下载失败，女友仓库返回：429 请求过快，请稍后再试')
+                return False
+            try:
+                Image.open(io.BytesIO(gfriends_response.content)).verify()  # 校验下载的图片
+            except:
+                print('!! ' + pic_path + ' 校验失败，可能下载的头像不完整。')
+            with open(pic_path, "wb") as code:
+                code.write(gfriends_response.content)
+            i += 1
+    else:
+        gfriends_response = session.get(url, proxies=proxies)
+        pic_path = download_path + actor_name + ".jpg"
+        if gfriends_response.status_code == 429:
+            print('!! ' + pic_path + ' 下载失败，女友仓库返回：429 请求过快，请稍后再试')
+            return False
+        try:
+            Image.open(io.BytesIO(gfriends_response.content)).verify()  # 校验下载的图片
+        except:
+            print('!! ' + pic_path + ' 校验失败，可能下载的头像不完整。')
+        with open(pic_path, "wb") as code:
+            code.write(gfriends_response.content)
+        actor_md5 = md5(actor_name.encode('UTF-8')).hexdigest()[12:-12]
+        inputed_dict[actor_md5] = gfriends_response.headers['Content-Length']  # 写入图片版本日志
+        proc_log.write(proc_md5 + '\n')
 
 
 @asyncc
@@ -263,8 +292,9 @@ def read_config(config_file):
             max_retries = config_settings.getint("下载设置", "MAX_Retry")
             Proxy = config_settings.get("下载设置", "Proxy")
             download_path = config_settings.get("下载设置", "Download_Path")
+            Conflict_Proc = config_settings.get("下载设置", "Conflict_Proc")
             max_upload_connect = config_settings.getint("导入设置", "MAX_UL")
-            Get_Intro = config_settings.getint("导入设置", "Get_Intro")
+            Get_Intro = config_settings.get("导入设置", "Get_Intro")
             local_path = config_settings.get("导入设置", "Local_Path")
             BD_App_ID = config_settings.get("导入设置", "BD_App_ID")
             BD_API_Key = config_settings.get("导入设置", "BD_API_Key")
@@ -328,7 +358,7 @@ def read_config(config_file):
                 BD_AI_client = None
             return (
                 repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy, aifix, debug,
-                deleteall, download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP, Get_Intro)
+                deleteall, download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP, Get_Intro, Conflict_Proc)
         except:
             print(format_exc())
             print('× 无法读取 config.ini。如果这是旧版本的配置文件，请删除后重试。\n')
@@ -366,9 +396,10 @@ Repository_Url = 默认
 AI_Fix = 是
 
 ### 多头像下载方式 ###
-# 仓库内可能存储了一位女友的多张头像，大多数情况会自动选择最优的一张。或者您也可以让程序把对应头像全部下载，并在导入前提醒您手动挑选。
+# 仓库内可能存储了一位女友的多张头像，大多数情况会自动选择最优的一张。
+# 您也可以让程序把对应头像全部下载，并在导入前提醒您手动挑选。手动挑选的头像会放在白名单里，不会被“增量导入”所覆盖。
 # 0 - 自动优选
-# 1 - 手动挑选（当有大量头像需要导入时，谨慎选择）
+# 1 - 手动挑选（谨慎选择，尤其是当有大量头像需要导入时）
 Conflict_Proc = 0
 
 ### HTTP / Socks 局部代理 ###
@@ -378,10 +409,10 @@ Conflict_Proc = 0
 Proxy = 
 
 [导入设置]
-### 搜索女友简介（测试版） ###
-# 顺便搜索演员信息并导入。为降低来源网站负载，只能单线程，因此会拖慢导入速度。
-# 0 - 不导入简介
-# 1 - 从 XSlist 获取简介
+### 搜索女友个人信息（测试版） ###
+# 顺便搜索演员信息并导入。为降低来源网站负载，暂时只能单线程，因此会拖慢导入速度。
+# 0 - 不搜索个人信息
+# 1 - 从 XSlist 获取个人信息
 Get_Intro = 0
 
 ### 本地头像文件夹 ###
@@ -397,7 +428,7 @@ OverWrite = 2
 ### 导入线程数 ###
 # 导入至本地或内网服务器时，网络稳定可适当增大导入线程数（推荐：20-100）
 # 导入至远程服务器时，可适当减小导入线程数（推荐：5-20）
-# 开启搜索女友简介时此选项无效
+# 开启“搜索女友个人信息”时此选项无效
 MAX_UL = 20
 
 ### 头像尺寸优化 ###
@@ -601,7 +632,7 @@ else:
 (config_file, quiet_flag) = argparse_function(version)
 if quiet_flag: sys.stdout = open("./Getter/quiet.log", "w", buffering=1)
 (repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy, aifix, debug, deleteall,
- download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP, Get_Intro) = read_config(
+ download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP, Get_Intro, Conflict_Proc) = read_config(
     config_file)
 
 # 持久会话
@@ -626,6 +657,7 @@ exist_list = []
 pic_path_dict = {}
 actor_dict = {}
 link_dict = {}
+inputed_dict = {}
 proc_flag = False
 
 print('Gfriends Inputer ' + version)
@@ -653,6 +685,7 @@ else:
 
 try:
     (list_persons, emby_flag) = read_persons(host_url, api_key, True)
+    list_persons = [{'Name': '@YOU', 'ServerId': 'be208b8f79ed449aacf99a1a23530488', 'Id': '59932', 'Type': 'Person', 'ImageTags': {'Primary': '3ad658cbfb0173e14bb09d255e84d64a'}, 'BackdropImageTags': []}]
     gfriends_map = get_gfriends_map(repository_url)
     actor_log = open('./Getter/演员清单.txt', 'w', encoding="UTF-8", buffering=1)
     actor_log.write('【演员清单】\n该清单仅供参考，下面可能还有导演、编剧、赞助商等其他人的名字，但是女友头像仓库只会收录日本女友。\n而已匹配到的头像则会根据个人配置，下载导入或会跳过\n\n')
@@ -695,10 +728,9 @@ try:
             actor_log.write('下载：' + actor_name + '\n')
             link_dict[actor_name] = pic_link
         actor_dict[actor_name] = actor_id
-        inputed_dict = {}
     actor_log.close()
 
-    if overwrite == '2':
+    if overwrite == '2' and Conflict_Proc == "0":
         md5_host_url = md5(host_url.encode('UTF-8')).hexdigest()[14:-14]
         if os.path.exists('./Getter/down' + md5_host_url + '.log'):  # 有下载记录，则逐行读取记录
             with open('./Getter/down' + md5_host_url + '.log', 'r', encoding='UTF-8') as file:
@@ -781,15 +813,37 @@ try:
                 continue
         print('√ 下载完成')
 
-    # 构建路径映射
-    for filename in os.listdir(download_path):
-        actorname = filename.replace('.jpg', '')
-        if '.jpg' in filename and actorname in actor_dict:
-            if overwrite == '2':
-                if actorname in link_dict:  # link_dict 已经初始化筛选，key 为需要导入的演员名
-                    pic_path_dict[filename] = download_path + filename
+    if Conflict_Proc == "1":
+        print('\n您已在配置文件中开启多头像的”手动挑选“')
+        print('请检查下载目录，删除不喜欢的头像')
+        print('\n1. 每位女友最好只保留一张头像，否则程序会自动选一张较好的')
+        print('2. 如果某位女友的头像全部被删除，则代表该不导入该女友的头像（不影响本地导入功能）\n')
+        rewriteable_word('完成挑选后，按任意键继续...')
+        os.system('pause>nul') if WINOS else input('Press Enter to continue...')
+        # 构建路径映射
+        files = os.listdir(download_path)
+        files.sort()
+        temp_list = []
+        for filename in reversed(files):
+            actorname = filename.replace('.jpg', '')
+            actorname = re.sub(r'\-\d+', '', actorname)
+            if '.jpg' in filename and actorname in actor_dict and actorname not in temp_list:
+                pic_path_dict[filename] = os.path.join(download_path,filename)
+                temp_list.append(actorname)
             else:
-                pic_path_dict[filename] = download_path + filename
+                # 删除多余的头像
+                os.remove(os.path.join(download_path,filename))
+        del temp_list
+    else:
+        # 构建路径映射
+        for filename in os.listdir(download_path):
+            actorname = filename.replace('.jpg', '')
+            if '.jpg' in filename and actorname in actor_dict:
+                if overwrite == '2':
+                    if actorname in link_dict:  # link_dict 已经初始化筛选，key 为需要导入的演员名
+                        pic_path_dict[filename] = download_path + filename
+                else:
+                    pic_path_dict[filename] = download_path + filename
     for root, dirs, files in os.walk(local_path):
         for filename in files:
             actorname = filename.replace('.jpg', '')
@@ -807,7 +861,7 @@ try:
     if not pic_path_dict:
         proc_log.close()
         os.remove('./Getter/proc.tmp')
-        if overwrite == '2':
+        if overwrite == '2' and Conflict_Proc == "0":
             down_log = open('./Getter/down' + md5_host_url + '.log', 'w', encoding="UTF-8")
             down_log.write(
                 '## Gfriends Inputer 导入记录 ##\n## 请注意：删除本文件会导致服务器 ' + host_url + ' 的增量更新功能重置\n' + md5_config + '\n')
@@ -837,6 +891,7 @@ try:
     with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
         for filename, pic_path in pic_path_dict.items():
             actorname = filename.replace('.jpg', '')
+            actorname = re.sub(r'\-\d+', '', actorname)
             bar.text('正在导入：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
                 '正在导入：' + actorname)
             bar()
@@ -849,8 +904,11 @@ try:
                 else:
                     url_post_img = host_url + 'jellyfin/Items/' + actor_dict[actorname] + '/Images/Primary?api_key=' + api_key
                 input_avatar(url_post_img, b6_pic)
-                if Get_Intro == 1:
+                if Get_Intro == "1":
                     xslist_search(actor_dict[actorname], actorname)
+                    bar.text(
+                        '搜索信息：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
+                        '搜索信息：' + actorname)
             proc_log.write(proc_md5 + '\n')
             while True:
                 if threading.activeCount() > max_upload_connect + 1:
@@ -866,7 +924,7 @@ try:
             continue
     proc_log.close()
     os.remove('./Getter/proc.tmp')
-    if overwrite == '2':
+    if overwrite == '2' and Conflict_Proc == "0":
         down_log = open('./Getter/down' + md5_host_url + '.log', 'w', encoding="UTF-8")
         down_log.write(
             '## Gfriends Inputer 导入记录 ##\n## 请注意：删除本文件会导致服务器 ' + host_url + ' 的增量更新功能重置\n' + md5_config + '\n')
