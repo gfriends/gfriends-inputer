@@ -120,7 +120,7 @@ def xslist_search(id, name):
 
         url_post = host_url + 'emby/Items/' + id + '?api_key=' + api_key
         session.post(url_post, json=detial_json, proxies=proxies)
-        logger.info(name + '个人信息已上传')
+        logger.debug(name + '个人信息已上传')
         return True
     except (KeyboardInterrupt, SystemExit):
         sys.exit()
@@ -807,7 +807,7 @@ if not proxies:
     if public_ip and 'CN' in public_ip:
         print(public_ip, '推荐开启全局代理\n')
     elif public_ip and 'CN' not in public_ip:
-        print(public_ip, '正通过全局代理访问\n')
+        print(public_ip, '正通过非大陆IP访问\n')
     else:
         print('推荐开启全局代理\n')
 else:
@@ -911,7 +911,7 @@ try:
                 continue
     if proc_flag:
         print('√ 引擎初始化成功，尝试从上次中断位置继续')
-        logger.info('引擎初始化成功，断点续传')
+        logger.info('引擎初始化成功，断点续传模式')
     else:
         print('√ 引擎初始化成功                      ')
         logger.info('引擎初始化成功')
@@ -994,7 +994,7 @@ try:
                         pic_path_dict[filename] = download_path + filename
                 else:
                     pic_path_dict[filename] = download_path + filename
-    logger.info('下载头像目录构建完毕')
+    logger.info('下载头像目录构建完成')
     for root, dirs, files in os.walk(local_path):
         for filename in files:
             actorname = filename.replace('.jpg', '')
@@ -1008,7 +1008,7 @@ try:
                     inputed_dict[actor_md5] = file_size
                 else:
                     pic_path_dict[filename] = file_path
-    logger.info('本地头像目录构建完毕')
+    logger.info('本地头像目录构建完成')
 
     if not pic_path_dict:
         proc_log.close()
@@ -1027,7 +1027,7 @@ try:
 
     if fixsize:
         print('\n>> 尺寸优化...')
-        logger.info('头像尺寸优化')
+        logger.info('开始优化头像尺寸')
         with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
             for filename, pic_path in pic_path_dict.items():
                 bar.text('正在优化：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
