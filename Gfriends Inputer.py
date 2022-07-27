@@ -2,7 +2,8 @@
 # Gfriends Inputer / 女友头像仓库导入工具
 # Licensed under the MIT license.
 # Designed by xinxin8816, many thanks for junerain123, ddd354, moyy996.
-version = 'v3.0.0'
+version = 'v3.00'
+compatible_conf_version = ['v3.00']
 
 import requests, os, io, sys, time, re, threading, argparse, logging
 from alive_progress import alive_bar
@@ -334,6 +335,12 @@ def read_config(config_file):
         config_settings = RawConfigParser()
         try:
             config_settings.read('config.ini', encoding='UTF-8-SIG')  # UTF-8-SIG 适配 Windows 记事本
+            Version = config_settings.get("调试功能", "Version")
+            if Version not in compatible_conf_version:
+                logger.error('不兼容的配置文件：' + Version + "，需要：" + "/".join(compatible_conf_version))
+                print("不兼容的配置文件，请删除后重试。")
+                if WINOS: print('按任意键退出程序...'); os.system('pause>nul')
+                os._exit(1)
             repository_url = config_settings.get("下载设置", "Repository_Url")
             host_url = config_settings.get("媒体服务器", "Host_Url")
             api_key = config_settings.get("媒体服务器", "Host_API")
