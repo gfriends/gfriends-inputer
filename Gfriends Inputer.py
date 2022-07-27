@@ -27,11 +27,11 @@ def fix_size(type, path):
                 fixed_pic = fixed_pic.filter(ImageFilter.GaussianBlur(radius=50))  # 高斯平滑滤镜
                 fixed_pic.paste(pic, (0, int((3 / 2 * wf - hf) / 2)))  # 粘贴原图
                 fixed_pic.save(path, quality=95)
-                logger.info('高斯滤镜处理成功' + path)
+                logger.debug('高斯滤镜处理成功' + path)
             elif type == 2:
                 fixed_pic = pic.crop((int(wf / 2 - 1 / 3 * hf), 0, int(wf / 2 + 1 / 3 * hf), int(hf)))  # 像素中线向两边扩展
                 fixed_pic.save(path, quality=95)
-                logger.info('普通裁剪成功' + path)
+                logger.debug('普通裁剪成功' + path)
             elif type == 3 or type == 4:
                 try:
                     if type == 3:
@@ -52,7 +52,7 @@ def fix_size(type, path):
                         x_left = x_nose - 1 / 3 * hf  # 以鼻子为中线向两边扩展
                     fixed_pic = pic.crop((x_left, 0, x_left + 2 / 3 * hf, hf))
                     fixed_pic.save(path, quality=95)
-                    logger.info('AI 裁剪成功' + path)
+                    logger.debug('AI 裁剪成功' + path)
                 except KeyboardInterrupt:
                     sys.exit()
                 except:
@@ -92,7 +92,7 @@ def xslist_search(id, name):
             logger.debug(name + '搜索到个人信息：' + detial_url)
         except:
             logger.info(name + '未找到个人信息')
-            sys.exit()
+            return False
 
         # 获取详情页
         response = session.get(detial_url, proxies=proxies, timeout=10)
@@ -109,7 +109,7 @@ def xslist_search(id, name):
             logger.debug(name + '已获取个人信息：' + detial_info)
         except:
             logger.warning(name + '个人信息解析失败，页面：' + detial_url)
-            sys.exit()
+            return False
 
         # 重组请求json
         detial_json = {'Name': name,
@@ -120,11 +120,12 @@ def xslist_search(id, name):
         url_post = host_url + 'emby/Items/' + id + '?api_key=' + api_key
         session.post(url_post, json=detial_json, proxies=proxies)
         logger.info(name + '个人信息已上传')
+        return True
     except (KeyboardInterrupt, SystemExit):
         sys.exit()
     except:
         logger.warning(name + '个人信息刮削失败：' + format_exc())
-        return
+        return False
 
 
 def get_gfriends_map(repository_url):
@@ -307,7 +308,7 @@ def del_avatar(url_post_img):
 def get_gfriends_link(name):
     if name in gfriends_map:
         output = gfriends_map[name]
-        logger.debug(name + ' 解析到头像地址：' + output)
+        logger.debug(name + ' 解析到头像地址：' + str(output))
         return output
     else:
         logger.debug(name + ' 未解析到头像')
@@ -319,9 +320,11 @@ def argparse_function(ver: str) -> [str, str, bool]:
     parser.add_argument("-c", "--config", default='config.ini', nargs='?', help="The config file Path.")
     parser.add_argument("-q", "--quiet", dest='quietflag', action="store_true",
                         help="Assume Yes on all queries and Print logs to file.")
+    parser.add_argument("--skip-update", dest='updateflag', action="store_false",
+                        help="Skip update check and try to exec old version.")
     parser.add_argument("-v", "--version", action="version", version=ver)
     args = parser.parse_args()
-    return args.config, args.quietflag
+    return args.config, args.quietflag, args.updateflag
 
 
 def read_config(config_file):
@@ -426,6 +429,7 @@ Download_Path = ./Downloads/
 
 ### 下载线程数 ###
 # 若网络不稳定、丢包率或延迟较高，可适当减小下载线程数
+# 速度太快会被 GitHub 暂时拉黑 IP： 429 too many requests
 MAX_DL = 5
 
 ### 下载失败重试数 ###
@@ -706,7 +710,7 @@ else:
         os.chdir(config_path)  # 切换工作目录
     logger.debug('修正运行目录：' + config_path + ':' + work_path)
 
-(config_file, quiet_flag) = argparse_function(version)
+(config_file, quiet_flag, update_flag) = argparse_function(version)
 # if quiet_flag:
 #   sys.stdout = open("./Getter/quiet.log", "w", buffering=1)
 (repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy, aifix, debug, deleteall,
@@ -739,7 +743,7 @@ else:
 
 # 检查更新
 public_ip = None
-check_update()
+if update_flag: check_update()
 if deleteall: del_all()
 
 # 变量初始化
@@ -883,8 +887,12 @@ try:
         with alive_bar(len(link_dict), enrich_print=False, dual_line=True) as bar:
             for actor_name, link in link_dict.items():
                 try:
-                    bar.text('正在下载：' + re.sub(r'（.*）', '', actor_name)) if '（' in actor_name else bar.text(
-                        '正在下载：' + actor_name)
+                    if Conflict_Proc == 1 and not quiet_flag:
+                        bar.text('正在下载：' + re.sub(r'（.*）', '', actor_name) + ' [' + str(len(link)) + '枚]') if '（' in actor_name else bar.text(
+                            '正在下载：' + actor_name + ' [' + str(len(link)) + '枚]')
+                    else:
+                        bar.text('正在下载：' + re.sub(r'（.*）', '', actor_name)) if '（' in actor_name else bar.text(
+                            '正在下载：' + actor_name)
                     bar()
                     proc_md5 = md5((actor_name + '+1').encode('UTF-8')).hexdigest()[13:-13]
                     if not proc_flag or (proc_flag and not proc_md5 in proc_list):

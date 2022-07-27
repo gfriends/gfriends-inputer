@@ -10,14 +10,21 @@ try:
     # opencv_dnn_model = cv2.dnn.readNetFromCaffe("./Lib/deploy.prototxt",
     #                                              "./Lib/res10_300x300_ssd_iter_140000_fp16.caffemodel")
 
-    # Load a model stored in TensorFlow
-    opencv_dnn_model = cv2.dnn.readNetFromTensorflow("./Lib/opencv_face_detector_uint8.pb",
-                                                    "./Lib/opencv_face_detector.pbtxt")
-    logger.info('OpenCV 初始化成功')
+    pb_path = "./Lib/opencv_face_detector_uint8.pb"
+    pbtxt_path = "./Lib/opencv_face_detector.pbtxt"
+    if os.path.exists(pb_path) and os.path.exists(pbtxt_path):
+        # Load a model stored in TensorFlow
+        opencv_dnn_model = cv2.dnn.readNetFromTensorflow(pb_path, pbtxt_path)
+        logger.info('OpenCV 初始化成功')
+    else:
+        logger.warning('OpenCV 初始化失败：Lib库文件缺失。')
+        print('OpenCV 初始化失败：Lib库文件缺失。')
+        print('请重新下载程序，否则强制继续运行可能引发异常。')
+        input('Press Enter to continue...')
 except cv2.error:
     logger.warning('OpenCV 初始化失败：' + format_exc().replace('\n',''))
-    print('OpenCV 初始化失败，这通常是由于文件缺失导致的，继续运行则可能引发异常。')
-    print('请重新下载程序，或关闭本地AI功能。')
+    print('OpenCV 初始化失败，这通常是由于Lib库文件缺失导致的，极小概率几率是CPU不兼容。')
+    print('请重新下载程序或关闭本地AI功能，否则强制继续运行可能引发异常。')
     input('Press Enter to continue...')
 
 def find_faces(img):
