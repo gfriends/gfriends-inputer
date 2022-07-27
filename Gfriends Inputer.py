@@ -92,7 +92,7 @@ def xslist_search(id, name):
             detial_url = html.xpath('/html/body/ul/li/h3/a/@href')[0]
             logger.debug(name + '搜索到个人信息：' + detial_url)
         except:
-            logger.info(name + '未找到个人信息')
+            logger.debug(name + '未找到个人信息')
             return False
 
         # 获取详情页
