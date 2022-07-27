@@ -781,7 +781,7 @@ else:
 
 # 检查更新
 public_ip = None
-if update_flag: check_update()
+if update_flag and not quiet_flag: check_update()
 if deleteall: del_all()
 
 # 变量初始化
