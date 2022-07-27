@@ -199,15 +199,15 @@ def get_gfriends_map(repository_url):
                 # print(second,k, v)
                 if k[:-4] in output:
                     output[k[:-4]].append(gfriends_template.format('Content', second, v))
-                    #logger.debug('解析头像地址，多头像附加：' + k[:-4] + ' -> ' + gfriends_template.format('Content', second, v))
+                    # logger.debug('解析头像地址，多头像附加：' + k[:-4] + ' -> ' + gfriends_template.format('Content', second, v))
                 else:
                     output[k[:-4]] = [gfriends_template.format('Content', second, v)]
-                    #logger.debug('解析头像地址，新增：' + k[:-4] + ' -> ' + gfriends_template.format('Content', second, v))
+                    # logger.debug('解析头像地址，新增：' + k[:-4] + ' -> ' + gfriends_template.format('Content', second, v))
     else:
         for second in map_json['Content'].keys():
             for k, v in map_json['Content'][second].items():
                 output[k[:-4]] = gfriends_template.format('Content', second, v)
-                #logger.debug('解析头像地址：'+ k[:-4] +' -> ' + gfriends_template.format('Content', second, v))
+                # logger.debug('解析头像地址：'+ k[:-4] +' -> ' + gfriends_template.format('Content', second, v))
 
     logger.info('文件树解析成功，库存头像：' + str(map_json['Information']['TotalNum']))
     print('   库存头像：' + str(map_json['Information']['TotalNum']) + '枚\n')
@@ -389,10 +389,8 @@ def read_config(config_file):
             # 创建文件夹
             if not os.path.exists('./Getter/'):
                 os.makedirs('./Getter/')
-                write_txt("./Getter/README.txt", '本目录自动生成，用于存放下载记录及导入日志等文件。')
             if not os.path.exists(download_path):
                 os.makedirs(download_path)
-                write_txt(download_path + "/README.txt", '本目录自动生成，用于存放从仓库下载和处理过的头像。')
             if not os.path.exists(local_path):
                 os.makedirs(local_path)
                 write_txt(local_path + "/README.txt",
@@ -458,8 +456,8 @@ Conflict_Proc = 0
 Proxy = 
 
 [导入设置]
-### 搜索女友个人信息（测试版） ###
-# 顺便搜索演员信息并导入。为降低来源网站负载，暂时只能单线程，因此会拖慢导入速度。
+### 搜索女友个人信息 ###
+# 刮削演员信息并导入。为降低来源网站负载，暂时只能单线程，因此会拖慢导入速度。
 # 0 - 不搜索个人信息
 # 1 - 从 XSlist 获取个人信息
 Get_Intro = 0
@@ -688,10 +686,13 @@ def check_update():
         # 清屏
         os.system('cls')
 
+
 # 日志记录器
+if not os.path.exists('./Getter/'): os.makedirs('./Getter/')
 if os.path.exists('./Getter/logger.log'): os.remove('./Getter/logger.log')
 logger = logging.getLogger()
-logging.basicConfig(filename='./Getter/logger.log', format='%(asctime)s - [%(levelname)s]%(lineno)d:%(funcName)s: %(message)s',
+logging.basicConfig(filename='./Getter/logger.log',
+                    format='%(asctime)s - [%(levelname)s]%(lineno)d:%(funcName)s: %(message)s',
                     datefmt="%Y-%m-%d %H:%M:%S", encoding="utf-8", level=logging.INFO)
 
 WINOS = True if sys.platform.startswith('win') else False
@@ -706,7 +707,7 @@ else:
     logger.debug('修正运行目录：' + config_path + ':' + work_path)
 
 (config_file, quiet_flag) = argparse_function(version)
-#if quiet_flag:
+# if quiet_flag:
 #   sys.stdout = open("./Getter/quiet.log", "w", buffering=1)
 (repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy, aifix, debug, deleteall,
  download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP, Get_Intro,
@@ -777,7 +778,7 @@ else:
 
 try:
     (list_persons, emby_flag) = read_persons(host_url, api_key, True)
-    #list_persons = [{'Name': '@YOU', 'ServerId': 'be208b8f79ed449aacf99a1a23530488', 'Id': '59932', 'Type': 'Person', 'ImageTags': {'Primary': '3ad658cbfb0173e14bb09d255e84d64a'}, 'BackdropImageTags': []}]
+    # list_persons = [{'Name': '@YOU', 'ServerId': 'be208b8f79ed449aacf99a1a23530488', 'Id': '59932', 'Type': 'Person', 'ImageTags': {'Primary': '3ad658cbfb0173e14bb09d255e84d64a'}, 'BackdropImageTags': []}]
     gfriends_map = get_gfriends_map(repository_url)
     actor_log = open('./Getter/演员清单.txt', 'w', encoding="UTF-8", buffering=1)
     actor_log.write('【演员清单】\n该清单仅供参考，下面可能还有导演、编剧、赞助商等其他人的名字，但是女友头像仓库只会收录日本女友。\n而已匹配到的头像则会根据个人配置，下载导入或会跳过\n\n')
@@ -1047,7 +1048,7 @@ try:
     print('√ 导入完成  ')
     print('\nEmby / Jellyfin 演职人员共 ' + str(len(list_persons)) + ' 人，其中 ' + str(num_exist) + ' 人之前已有头像')
     print('本次导入/更新头像 ' + str(num_suc) + ' 枚，还有 ' + str(num_fail) + ' 人没有头像\n')
-    logger.info('导入头像完成，成功/失败/存在/总数：'+str(num_suc) + str(num_fail) +str(num_exist) +str(len(list_persons)))
+    logger.info('导入头像完成，成功/失败/存在/总数：' + str(num_suc) + str(num_fail) + str(num_exist) + str(len(list_persons)))
     if not overwrite:
         print('-- 未开启覆盖已有头像，所以跳过了一些演员，详见 Getter 目录下的记录清单')
 except KeyboardInterrupt:
