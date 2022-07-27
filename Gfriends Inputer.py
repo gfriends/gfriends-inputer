@@ -653,27 +653,58 @@ def check_update():
             logger.info('检测到新版本：' + str(local_ver) + ' -> ' + str(remote_ver))
             print(loads(response.text)[0]['name'] + ' 发布啦！\n')
             print(loads(response.text)[0]['body'])
-            print('了解详情：https://git.io/JL0tk')
-            print('或通过如下链接下载：')
+            print('了解详情：https://git.io/JL0tk\n')
+
+            # 获取新版本下载链接
+            download_link = ""
             for item in loads(response.text)[0]['assets']:
                 if sys.platform.startswith('win') and (
                         'windows' in item['browser_download_url'] or 'Windows' in item['browser_download_url']):
-                    print(item['browser_download_url'])
+                    download_link = item['browser_download_url']
                     break
                 if sys.platform.startswith('darwin') and (
                         'macos' in item['browser_download_url'] or 'macOS' in item['browser_download_url']):
-                    print(item['browser_download_url'])
+                    download_link = item['browser_download_url']
                     break
                 if sys.platform.startswith('linux') and (
                         'ubuntu' in item['browser_download_url'] or 'Linux' in item['browser_download_url']):
-                    print(item['browser_download_url'])
+                    download_link = item['browser_download_url']
                     break
-            print('')
-            rewriteable_word('按任意键跳过更新...')
-            os.system('pause>nul') if WINOS else input('Press Enter to skip...')
-            print('即将跳过更新。不推荐跳过更新，如遇问题请及时更新。')
-            time.sleep(3)
-            logger.warning('手动跳过更新')
+
+            # 下载新版本
+            if download_link:
+                response = requests.get(download_link, stream=True)  # 必须用流式传输
+                got_size = 0  # 初始化已下载大小
+                chunk_size = 1024  # 每次下载的数据大小
+                content_size = int(response.headers['content-length'])  # 下载文件总大小
+                try:
+                    if response.status_code == 200:  # 判断是否响应成功
+                        response.iter_content(chunk_size=chunk_size)
+                        with alive_bar(content_size, enrich_print=False, dual_line=True, monitor='{percent:.0%}',
+                                       elapsed=False,
+                                       stats=False, spinner=None, receipt=True) as bar:
+                            with open("./update.zip", 'wb') as file:  # 显示进度条
+                                for data in response.iter_content(chunk_size=chunk_size):
+                                    file.write(data)
+                                    got_size += len(data)
+                                    bar(len(data))
+                                    bar.text(
+                                        '下载中：%.2fMB/%.2fMB' % (
+                                        float(got_size / 1024 / 1024), float(content_size / 1024 / 1024)))
+
+                        print("update.zip 已下载成功，请解压后使用新版本。")
+                        logger.info("更新包下载成功")
+                    else:
+                        print("下载失败，请上述通过详情链接下载。服务器返回：", response.status_code)
+                        logger.warning("更新包下载失败，服务器返回：", response.status_code)
+                except:
+                    print("更新包下载失败，请手动下载：", download_link)
+                    logger.warning("更新包下载失败：", format_exc())
+
+            print("")
+            rewriteable_word('按任意键退出...')
+            os.system('pause>nul') if WINOS else input('Press Enter to exit...')
+            os._exit(0)
         else:
             logger.info('未检测到新版本')
     except requests.exceptions:
