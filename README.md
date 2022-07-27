@@ -6,7 +6,9 @@
 * [快速开始](#快速开始)
 * [进阶说明](#进阶说明)
    * [使用 AI 精准裁剪头像](#精准裁剪头像)
-   * [导入本地头像图片](#导入本地头像图片)
+   * [刮削演员个人信息](#刮削演员个人信息)
+   * [定时自动运行](#定时自动运行)
+   * [导入本地头像](#导入本地头像)
    * [自定义头像来源](#自定义头像来源)
    * [第三方刮削工具](#第三方刮削工具)
 * [许可证及法律信息](#许可证及法律信息)
@@ -28,13 +30,14 @@
 *提示：v2.x 旧版本的 Mac/Linux 配置文件在用户根目录，常见在：`/Users/username/`、`/home/username/`、`/root/`*
 
 ```
-命令: "Gfriends Inputer" [-h] [-c [CONFIG]] [-q] [-v]
+CLI 命令: "Gfriends Inputer" [-h] [-c [CONFIG]] [-q] [-v]
 
 选项说明:
-  -h, --help            显示本帮助信息。
   -c [CONFIG], --config [CONFIG]
                         指定配置文件路径，默认为运行目录。
-  -q, --quiet           静默模式运行，并保存日志到文件。
+  -h, --help            显示本帮助信息。
+  -q, --quiet           静默模式运行，不输出任何信息。
+  --skip-update         跳过更新检查，强制运行旧版本。
   -v, --version         显示当前版本。
 ```
 
@@ -43,7 +46,7 @@
 git clone https://github.com/gfriends/gfriends-inputer.git
 cd ./gfriends-inputer
 pip install -r requirements.txt
-python "./Gfriends Inputer.py"
+python3 "./Gfriends Inputer.py"
 ```
 
 ## 进阶说明
@@ -54,10 +57,10 @@ python "./Gfriends Inputer.py"
 
 仓库中的头像可能尺寸不标准，媒体服务器会自动拉伸使头像变形，这时需要裁剪头像。虽很少遇到这种情况，但为避免裁剪到演员面部，您应当配置 AI 精准裁剪。
 
-**1. Pigo AI**<br>
+**1. OpenCV DNN AI**<br>
 *Gfriends Inputer v3.0 及后续版本支持*
 
-[Pigo](https://github.com/esimov/pigo) 提供无感知的人脸识别。准确度偏低，但速度极快且无需联网。仅需在配置文件中开启。
+默认开启，无需配置。[OpenCV](https://opencv.org/) 提供本地无感知的人脸识别，兼具准确度与速度且无需联网。
 
 **2. 百度 AI**<br>
 *Gfriends Inputer v2.7 及后续版本支持*
@@ -69,7 +72,24 @@ python "./Gfriends Inputer.py"
 2. 进入 “人体分析” —— “创建应用”，按要求填写表单，并勾选 “人体分析” 接口。
 3. 进入 “人体分析” —— “管理应用”，获取 `BD_App_ID`、`BD_API_Key`、`BD_Secret_Key`，并编辑配置文件中 `百度AI API` 部分。
 
-### 【导入本地头像图片】
+### 【刮削演员个人信息】
+*Gfriends Inputer v3.0 及后续版本支持*
+
+仅需在配置文件中开启。程序会在下载头像后，顺便搜索女友的个人信息（生日、三围、身高等），然后一并导入服务器。
+
+### 【定时自动运行】
+*Gfriends Inputer v2.6 及后续版本支持*
+
+在首次运行测试无误后，您可以把命令写入 Crontab 任务，来定时后台运行程序。
+
+```
+#每天零点运行，不输出日志
+0 0 * * * "/home/user/gfriends Inputer"
+#周一零点运行，输出日志，并指定配置文件路径
+0 0 * * 0 "/home/user/gfriends Inputer" -q -c "/home/user/config.ini"
+```
+
+### 【导入本地头像】
 *Gfriends Inputer v2.5 及后续版本支持*
 
 程序首次启动时会自动创建 `Avatar` 文件夹（可在配置文件中修改）。将本地头像图片重命名为`演员姓名.jpg`，或将第三方头像包移动至该文件夹。此后，导入工具优先从该文件夹查找并导入头像，本地路径中不存在的则会尝试从 Gfriends 仓库搜索并导入。
@@ -80,9 +100,9 @@ python "./Gfriends Inputer.py"
 但是，每个人的喜好不同。比如，有的人可能不喜欢 Graphis 的头像，因为上面有标记女友名。有些人可能不喜欢 EBODY 的头像，因为女友衣着太暴露了。
 
 **1. 手动选择头像**<br>
-*Gfriends Inputer v3.0 及后续版本支持，仅 Windows*
+*Gfriends Inputer v3.0 及后续版本支持*
 
-程序在遇到多头像时，自动弹窗罗列所有头像，您只需点击即可选择对应的头像。
+仅需在配置文件中开启。程序在遇到多头像时，自动下载对应演员的所有头像，您可以手动删除不喜欢的头像。
 
 **2. 厂牌黑名单**<br>
 *Gfriends Inputer v2.x 支持*
