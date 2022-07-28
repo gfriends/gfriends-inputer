@@ -2,8 +2,8 @@
 # Gfriends Inputer / 女友头像仓库导入工具
 # Licensed under the MIT license.
 # Designed by xinxin8816, many thanks for junerain123, ddd354, moyy996.
-version = 'v3.00'
-compatible_conf_version = ['v3.00']
+version = 'v3.01'
+compatible_conf_version = ['v3.00', 'v3.01']
 
 import requests, os, io, sys, time, re, threading, argparse, logging
 from alive_progress import alive_bar
@@ -92,7 +92,7 @@ def xslist_search(id, name):
             detial_url = html.xpath('/html/body/ul/li/h3/a/@href')[0]
             logger.debug(name + '搜索到个人信息：' + detial_url)
         except:
-            logger.info(name + '未找到个人信息')
+            logger.debug(name + '未找到个人信息')
             return False
 
         # 获取详情页
@@ -651,10 +651,12 @@ def check_update():
         # version process
         # `v2.94` > `2.94`
         # `v3.0.0` > `3.0.0` > `0.0.3` > `00.3` > `3.00`
-        local_ver = version.replace('v', '')[::-1].replace('.', '', 1)[::-1]
+        local_ver = version.replace('v', '')
         remote_ver = loads(response.text)[0]['tag_name'].replace('v', '')
         if remote_ver.count('.') > 1:
             remote_ver = remote_ver[::-1].replace('.', '', 1)[::-1]
+        if local_ver.count('.') > 1:
+            local_ver = local_ver[::-1].replace('.', '', 1)[::-1]
 
         if (float(local_ver) < float(remote_ver)) and not quiet_flag:
             logger.info('检测到新版本：' + str(local_ver) + ' -> ' + str(remote_ver))
@@ -781,7 +783,7 @@ else:
 
 # 检查更新
 public_ip = None
-if update_flag: check_update()
+if update_flag and not quiet_flag: check_update()
 if deleteall: del_all()
 
 # 变量初始化
@@ -807,7 +809,7 @@ if not proxies:
     if public_ip and 'CN' in public_ip:
         print(public_ip, '推荐开启全局代理\n')
     elif public_ip and 'CN' not in public_ip:
-        print(public_ip, '正通过非大陆IP访问\n')
+        print(public_ip, '非中国大陆访问\n')
     else:
         print('推荐开启全局代理\n')
 else:
