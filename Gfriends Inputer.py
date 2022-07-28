@@ -871,18 +871,18 @@ try:
         if os.path.exists('./Getter/down' + md5_host_url + '.log'):  # 有下载记录，则逐行读取记录
             with open('./Getter/down' + md5_host_url + '.log', 'r', encoding='UTF-8') as file:
                 downlog_list = file.read().split('\n')
-        down_log = open('./Getter/down' + md5_host_url + '.log', 'w', encoding="UTF-8")
-        if md5_config in downlog_list:
-            for item in downlog_list:
-                if '|' in item:
-                    inputed_dict[item.split('|')[0]] = item.split('|')[1]
-                elif item == '':
-                    pass
-                down_log.write(item + '\n')
-        else:
-            down_log.write(
-                '## Gfriends Inputer 导入记录 ##\n## 请注意：删除本文件会导致服务器 ' + host_url + ' 的增量更新功能重置\n' + md5_config + '\n')
-        down_log.close()
+            down_log = open('./Getter/down' + md5_host_url + '.log', 'w', encoding="UTF-8")
+            if md5_config in downlog_list:
+                for item in downlog_list:
+                    if '|' in item:
+                        inputed_dict[item.split('|')[0]] = item.split('|')[1]
+                    elif item == '':
+                        pass
+                    down_log.write(item + '\n')
+            else:
+                down_log.write(
+                    '## Gfriends Inputer 导入记录 ##\n## 请注意：删除本文件会导致服务器 ' + host_url + ' 的增量更新功能重置\n' + md5_config + '\n')
+            down_log.close()
 
         for index, actor_name in enumerate(list(link_dict)):  # 有删除字典的操作，不能直接遍历字典
             try:
@@ -1109,3 +1109,4 @@ except:
 if WINOS and not quiet_flag:
     print('按任意键退出程序...')
     os.system('pause>nul')
+logger.info('正常退出')
