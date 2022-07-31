@@ -2,8 +2,8 @@
 # Gfriends Inputer / 女友头像仓库导入工具
 # Licensed under the MIT license.
 # Designed by xinxin8816, many thanks for junerain123, ddd354, moyy996.
-version = 'v3.01'
-compatible_conf_version = ['v3.00', 'v3.01']
+version = 'v3.02'
+compatible_conf_version = ['v3.00', 'v3.01', 'v3.02']
 
 import requests, os, io, sys, time, re, threading, argparse, logging
 from alive_progress import alive_bar
@@ -141,7 +141,7 @@ def get_gfriends_map(repository_url):
     keep_tree = False
     if os.path.exists('./Getter/Filetree.json'):
         # 加 deflate 请求以防压缩无法获取真实大小
-        gfriends_response = session.head(filetree_url, proxies=proxies, timeout=1,
+        gfriends_response = session.head(filetree_url, proxies=proxies, timeout=5,
                                          headers={'Accept-Encoding': 'deflate'})
         if os.path.getsize('./Getter/Filetree.json') == int(gfriends_response.headers['Content-Length']):
             keep_tree = True
@@ -156,7 +156,7 @@ def get_gfriends_map(repository_url):
         logger.info('仓库文件树未更新，使用缓存')
     else:
         try:
-            response = session.get(filetree_url, proxies=proxies, timeout=15)
+            response = session.get(filetree_url, proxies=proxies, timeout=30)
             # 修复部分服务端返回 header 未指明编码使后续解析错误
             response.encoding = 'utf-8'
         except requests.exceptions.RequestException:
@@ -534,7 +534,7 @@ def read_persons(host_url, api_key, emby_flag):
     try:
         rqs_emby = session.get(url=host_url_persons,
                                headers={"User-Agent": 'Gfriends_Inputer/' + version.replace('v', '')},
-                               proxies=proxies, timeout=5)
+                               proxies=proxies, timeout=30, verify = False)
     except requests.exceptions.ConnectionError:
         logger.error('连接 Emby / Jellyfin 服务器失败：' + public_ip + format_exc())
         print('× 连接 Emby / Jellyfin 服务器失败，请检查地址是否正确：', host_url, '\n')
@@ -639,7 +639,7 @@ def check_update():
     try:
         get_ip()
         response = session.get('https://api.github.com/repos/gfriends/gfriends-inputer/releases', proxies=proxies,
-                               timeout=3)
+                               timeout=5)
         response.encoding = 'utf-8'
         """
         if response.status_code != 200:
@@ -804,7 +804,7 @@ if not quiet_flag:
     os.system('pause>nul') if WINOS else input('Press Enter to start...')
 
 # 代理配置提示
-logger.info('代理配置：' + str(proxies) + '，IP归属地：' + public_ip)
+logger.info('代理配置：' + str(proxies) + '，IP归属地：' + str(public_ip))
 if not proxies:
     if public_ip and 'CN' in public_ip:
         print(public_ip, '推荐开启全局代理\n')
