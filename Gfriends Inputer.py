@@ -308,9 +308,17 @@ def input_avatar(url, data):
 
 
 @asyncc
-def del_avatar(url_post_img):
+def del_avatar(id):
+    url_post_img = host_url + 'Items/' + id + '/Images/Primary?api_key=' + api_key
     session.delete(url=url_post_img, proxies=host_proxies)
-
+    # 重组请求json
+    detial_json = {'ProviderIds': '',
+                   'Taglines': [''],
+                   'Genres': [''],
+                   'Tags': [''],
+                   'Overview': ''}
+    url_post = host_url + 'Items/' + id + '?api_key=' + api_key
+    session.post(url_post, json=detial_json)
 
 def get_gfriends_link(name):
     if name in gfriends_map:
@@ -595,7 +603,7 @@ def rewriteable_word(word):
 
 
 def del_all():
-    print('【调试模式】删除所有头像\n')
+    print('【调试模式】删除所有头像及信息\n')
     (list_persons, emby_flag) = read_persons(host_url, api_key, True)
     rewriteable_word('按任意键开始...')
     os.system('pause>nul') if WINOS else input('Press Enter to start...')
@@ -604,13 +612,7 @@ def del_all():
             bar.text('正在删除：' + dic_each_actor['Name'])
             bar()
             if dic_each_actor['ImageTags']:
-                if emby_flag:
-                    url_post_img = host_url + 'emby/Items/' + dic_each_actor[
-                        'Id'] + '/Images/Primary?api_key=' + api_key
-                else:
-                    url_post_img = host_url + 'jellyfin/Items/' + dic_each_actor[
-                        'Id'] + '/Images/Primary?api_key=' + api_key
-                del_avatar(url_post_img)
+                del_avatar(dic_each_actor['Id'])
                 while True:
                     if not threading.activeCount() > max_upload_connect + 1: break
     rewriteable_word('>> 即将完成')
