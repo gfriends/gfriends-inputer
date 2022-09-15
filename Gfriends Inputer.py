@@ -552,15 +552,15 @@ def read_persons(host_url, api_key):
         rqs_emby = session.get(url=host_url_persons, proxies=host_proxies, timeout=60, verify=False)
     except requests.exceptions.ConnectionError:
         logger.error('连接 Emby / Jellyfin 服务器失败：' + public_ip + format_exc())
-        print('× 连接 Emby / Jellyfin 服务器失败，请检查地址是否正确：', host_url, '\n')
+        print('× 连接 Emby / Jellyfin 服务器失败，请检查地址是否正确：', host_url_persons, '\n')
         sys.exit()
     except requests.exceptions.RequestException:
         logger.error('连接 Emby / Jellyfin 服务器超时：' + public_ip + format_exc())
-        print('× 连接 Emby / Jellyfin 服务器超时，请检查地址是否正确：', host_url, '\n')
+        print('× 连接 Emby / Jellyfin 服务器超时，请检查地址是否正确：', host_url_persons, '\n')
         sys.exit()
     except:
-        logger.error('连接 Emby / Jellyfin 服务器未知错误：' + host_url + format_exc())
-        print('× 连接 Emby / Jellyfin 服务器未知错误：', host_url, '\n')
+        logger.error('连接 Emby / Jellyfin 服务器未知错误：' + host_url_persons + format_exc())
+        print('× 连接 Emby / Jellyfin 服务器未知错误：', host_url_persons, '\n')
         sys.exit()
     if rqs_emby.status_code == 401:
         logger.error('Emby / Jellyfin 返回：401 API 未授权')
@@ -568,7 +568,7 @@ def read_persons(host_url, api_key):
         sys.exit()
     elif rqs_emby.status_code == 404:
         logger.error('Emby / Jellyfin 返回 404 API 未找到，且备选 API 亦无效')
-        print('× 尝试读取 Emby / Jellyfin 演员列表但是未找到，可能是未适配的版本：', host_url, '\n')
+        print('× 尝试读取 Emby / Jellyfin 演员列表但是未找到，可能是未适配的版本：', host_url_persons, '\n')
         sys.exit()
     elif rqs_emby.status_code != 200:
         logger.error('Emby / Jellyfin 返回：' + str(rqs_emby.status_code))
@@ -1114,19 +1114,19 @@ try:
     print('\nEmby / Jellyfin 演职人员共 ' + str(len(list_persons)) + ' 人，其中 ' + str(num_exist) + ' 人之前已有头像')
     print('本次导入/更新头像 ' + str(num_suc) + ' 枚，还有 ' + str(num_fail) + ' 人没有头像\n')
     logger.info(
-        '导入头像完成，成功/失败/存在/总数：' + str(num_suc) + str(num_fail) + str(num_exist) + str(len(list_persons)))
+        '导入头像完成，成功/失败/存在/总数：' + str(num_suc) + '/' + str(num_fail) + '/' + str(num_exist) + '/' + str(len(list_persons)))
     if not overwrite:
         print('-- 未开启覆盖已有头像，所以跳过了一些演员，详见 Getter 目录下的记录清单')
 except KeyboardInterrupt:
     logger.info('用户强制停止')
     print('× 用户强制停止')
 except SystemExit:
-    logger.error('已知错误异常退出')
+    logger.error('已知错误')
     print('× 已知错误，请查阅 Getter 目录的 logger.log 日志文件。')
 except:
-    logger.error('未知错误异常退出：' + format_exc())
+    logger.error('未知错误：' + format_exc())
     print('× 未知错误，请查阅 Getter 目录的 logger.log 日志文件。')
 if WINOS and not quiet_flag:
     print('按任意键退出程序...')
     os.system('pause>nul')
-logger.info('正常退出')
+logger.info('退出程序')
