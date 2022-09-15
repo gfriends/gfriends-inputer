@@ -116,6 +116,8 @@ def xslist_search(id, name):
         detial_json = {'Name': name,
                        'ProviderIds': 'XSlist got by gfriends:' + detial_url,
                        'Taglines': ['日本AV女优'],
+                       'Genres': [],
+                       'Tags': ['日本AV女优'],
                        'Overview': detial_info}
 
         url_post = host_url + 'emby/Items/' + id + '?api_key=' + api_key
@@ -139,12 +141,16 @@ def get_gfriends_map(repository_url):
 
     # 检查文件树缓存
     keep_tree = False
-    if os.path.exists('./Getter/Filetree.json'):
-        # 加 deflate 请求以防压缩无法获取真实大小
-        gfriends_response = session.head(filetree_url, proxies=proxies, timeout=5,
-                                         headers={'Accept-Encoding': 'deflate'})
-        if os.path.getsize('./Getter/Filetree.json') == int(gfriends_response.headers['Content-Length']):
-            keep_tree = True
+    try:
+        if os.path.exists('./Getter/Filetree.json'):
+            # 加 deflate 请求以防压缩无法获取真实大小
+            gfriends_response = session.head(filetree_url, proxies=proxies, timeout=5,
+                                             headers={'Accept-Encoding': 'deflate'})
+            if os.path.getsize('./Getter/Filetree.json') == int(gfriends_response.headers['Content-Length']):
+                keep_tree = True
+    except:
+        logger.warning('检查文件树缓存失败：' + format_exc())
+        keep_tree = False
 
     if keep_tree:
         with open('./Getter/Filetree.json', 'r', encoding='utf-8') as json_file:
@@ -404,7 +410,7 @@ def read_config(config_file):
             if not os.path.exists(local_path):
                 os.makedirs(local_path)
                 write_txt(local_path + "/README.txt",
-                          '本目录自动生成，您可以存放自己收集的头像，这些头像将被优先导入服务器。\n\n请自行备份您收集头像的副本，根据个人配置不同，该目录文件可能会被程序修改。\n\n仅支持JPG格式，且请勿再创建子目录。\n\n如果您收集的头像位于子目录，可通过 Move To Here.bat（Only for Windows） 工具将其全部提取到根目录。')
+                          '本目录自动生成，您可以存放自己收集的头像（仅支持JPG格式），这些头像将被优先导入服务器。\n\n请自行备份您收集头像的副本，根据个人配置不同，该目录文件可能会被程序修改。')
             # 定义百度AI
             if fixsize == 3:
                 BD_AI_client = AipBodyAnalysis(BD_App_ID, BD_API_Key, BD_Secret_Key)
@@ -768,7 +774,8 @@ else:
     logger.setLevel(logging.INFO)
 
 # 初始化日志后再尝试引入CV2
-from Lib.cv2dnn import find_faces
+if fixsize == 3:
+    from Lib.cv2dnn import find_faces
 
 # 持久会话
 session = requests.Session()
