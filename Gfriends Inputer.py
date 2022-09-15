@@ -9,6 +9,7 @@ import requests, os, io, sys, time, re, threading, argparse, logging
 from alive_progress import alive_bar
 from configparser import RawConfigParser
 from traceback import format_exc
+from functools import reduce
 from hashlib import md5
 from base64 import b64encode
 from json import loads
@@ -86,7 +87,7 @@ def xslist_search(id, name):
     try:
         # 搜索
         url = "https://xslist.org/search?lg=zh&query=" + name
-        response = session.get(url, proxies=proxies, timeout=10)
+        response = session.get(url, timeout=10)
         html = etree.HTML(response.text)
         try:
             detial_url = html.xpath('/html/body/ul/li/h3/a/@href')[0]
@@ -96,7 +97,7 @@ def xslist_search(id, name):
             return False
 
         # 获取详情页
-        response = session.get(detial_url, proxies=proxies, timeout=10)
+        response = session.get(detial_url, timeout=10)
         html = etree.HTML(response.text)
         try:
             detial_list = html.xpath('/html/body/div[1]/div[3]/div/p[1]/descendant-or-self::text()')
@@ -121,7 +122,7 @@ def xslist_search(id, name):
                        'Overview': detial_info}
 
         url_post = host_url + 'emby/Items/' + id + '?api_key=' + api_key
-        session.post(url_post, json=detial_json, proxies=proxies)
+        session.post(url_post, json=detial_json)
         logger.debug(name + '个人信息已上传')
         return True
     except (KeyboardInterrupt, SystemExit):
@@ -144,7 +145,7 @@ def get_gfriends_map(repository_url):
     try:
         if os.path.exists('./Getter/Filetree.json'):
             # 加 deflate 请求以防压缩无法获取真实大小
-            gfriends_response = session.head(filetree_url, proxies=proxies, timeout=5,
+            gfriends_response = session.head(filetree_url, timeout=5,
                                              headers={'Accept-Encoding': 'deflate'})
             if os.path.getsize('./Getter/Filetree.json') == int(gfriends_response.headers['Content-Length']):
                 keep_tree = True
@@ -162,7 +163,7 @@ def get_gfriends_map(repository_url):
         logger.info('仓库文件树未更新，使用缓存')
     else:
         try:
-            response = session.get(filetree_url, proxies=proxies, timeout=30)
+            response = session.get(filetree_url, timeout=30)
             # 修复部分服务端返回 header 未指明编码使后续解析错误
             response.encoding = 'utf-8'
         except requests.exceptions.RequestException:
@@ -236,7 +237,7 @@ def check_avatar(url, actor_name, proc_md5):
         if actor_name in exist_list:  # 没有头像的演员跳过检测
             actor_md5 = md5(actor_name.encode('UTF-8')).hexdigest()[12:-12]
             if actor_md5 in inputed_dict:  # 没有下载过的演员跳过检测
-                gfriends_response = session.head(url, proxies=proxies, timeout=1)
+                gfriends_response = session.head(url, timeout=1)
                 if inputed_dict[actor_md5] == gfriends_response.headers['Content-Length']:
                     del link_dict[actor_name]
                     logger.debug(actor_name + '头像无需更新。')
@@ -260,7 +261,7 @@ def download_avatar(url, actor_name, proc_md5):
         urls = url
         i = 1
         for url in urls:
-            gfriends_response = session.get(url, proxies=proxies)
+            gfriends_response = session.get(url)
             pic_path = download_path + actor_name + "-" + str(i) + ".jpg"
             if gfriends_response.status_code == 429:
                 logger.warning(pic_path + ' 下载失败，女友仓库返回：429 请求过快，请稍后再试')
@@ -276,7 +277,7 @@ def download_avatar(url, actor_name, proc_md5):
             logger.debug(pic_path + ' 下载成功')
             i += 1
     else:
-        gfriends_response = session.get(url, proxies=proxies)
+        gfriends_response = session.get(url)
         pic_path = download_path + actor_name + ".jpg"
         if gfriends_response.status_code == 429:
             logger.warning(pic_path + ' 下载失败，女友仓库返回：429 请求过快，请稍后再试')
@@ -298,18 +299,17 @@ def download_avatar(url, actor_name, proc_md5):
 @asyncc
 def input_avatar(url, data):
     try:
-        session.post(url, data=data, headers={"Content-Type": 'image/jpeg',
-                                              "User-Agent": 'Gfriends_Inputer/' + version.replace('v', '')},
-                     proxies=proxies)
+        session.post(url, proxies=host_proxies, data=data, headers={"Content-Type": 'image/jpeg'})
         logger.debug(url.replace(host_url, '').replace(api_key, '***') + ' 导入成功。')
     except:
         logger.warning(url.replace(host_url, '').replace(api_key, '***') + ' 导入失败。' + format_exc())
-        print('!! ' + url.replace(host_url, '').replace(api_key, '***') + ' 导入失败，可能是与媒体服务器连接不稳定，请尝试降低导入线程数。')
+        print('!! ' + url.replace(host_url, '').replace(api_key,
+                                                        '***') + ' 导入失败，可能是与媒体服务器连接不稳定，请尝试降低导入线程数。')
 
 
 @asyncc
 def del_avatar(url_post_img):
-    session.delete(url=url_post_img, proxies=proxies)
+    session.delete(url=url_post_img, proxies=host_proxies)
 
 
 def get_gfriends_link(name):
@@ -538,9 +538,7 @@ def read_persons(host_url, api_key, emby_flag):
     else:
         host_url_persons = host_url + 'jellyfin/Persons?api_key=' + api_key  # &PersonTypes=Actor
     try:
-        rqs_emby = session.get(url=host_url_persons,
-                               headers={"User-Agent": 'Gfriends_Inputer/' + version.replace('v', '')},
-                               proxies=proxies, timeout=30, verify = False)
+        rqs_emby = session.get(url=host_url_persons, proxies=host_proxies, timeout=30, verify=False)
     except requests.exceptions.ConnectionError:
         logger.error('连接 Emby / Jellyfin 服务器失败：' + public_ip + format_exc())
         print('× 连接 Emby / Jellyfin 服务器失败，请检查地址是否正确：', host_url, '\n')
@@ -628,7 +626,7 @@ def del_all():
 def get_ip():
     global public_ip
     try:
-        response = session.get('https://api.myip.la/cn?json', proxies=proxies)
+        response = session.get('https://api.myip.la/cn?json')
         ip_country_code = loads(response.text)['location']['country_code']
         ip_country_name = loads(response.text)['location']['country_name']
         ip_city = loads(response.text)['location']['province']
@@ -644,8 +642,7 @@ def check_update():
     rewriteable_word('>> 检查更新...')
     try:
         get_ip()
-        response = session.get('https://api.github.com/repos/gfriends/gfriends-inputer/releases', proxies=proxies,
-                               timeout=5)
+        response = session.get('https://api.github.com/repos/gfriends/gfriends-inputer/releases', timeout=5)
         response.encoding = 'utf-8'
         """
         if response.status_code != 200:
@@ -705,7 +702,7 @@ def check_update():
                                     bar(len(data))
                                     bar.text(
                                         '下载中：%.2fMB/%.2fMB' % (
-                                        float(got_size / 1024 / 1024), float(content_size / 1024 / 1024)))
+                                            float(got_size / 1024 / 1024), float(content_size / 1024 / 1024)))
 
                         print("update.zip 已下载成功，请解压后使用新版本。")
                         logger.info("更新包下载成功")
@@ -777,16 +774,29 @@ else:
 if fixsize == 3:
     from Lib.cv2dnn import find_faces
 
+# 局部代理
+if Proxy:
+    proxies = host_proxies = {'http': Proxy, 'https': Proxy}
+    # 根据 IP 判断内网服务器
+    if re.search(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", host_url):
+        ip = reduce(lambda x, y: (x << 8) + y, map(int, re.search(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", host_url)[0].split('.')))
+        net_a = reduce(lambda x, y: (x << 8) + y, map(int, '10.255.255.255'.split('.'))) >> 24
+        net_b = reduce(lambda x, y: (x << 8) + y, map(int, '172.31.255.255'.split('.'))) >> 20
+        net_c = reduce(lambda x, y: (x << 8) + y, map(int, '192.168.255.255'.split('.'))) >> 16
+        if ip >> 24 == net_a or ip >> 20 == net_b or ip >> 16 == net_c:
+            host_proxies = {'http': None, 'https': None}
+        del net_a,net_b,net_c,ip
+    elif 'localhost' in host_url:
+        host_proxies = {'http': None, 'https': None}
+else:
+    proxies = host_proxies= None
+
 # 持久会话
 session = requests.Session()
 session.mount('http://', requests.adapters.HTTPAdapter(max_retries=max_retries))
 session.mount('https://', requests.adapters.HTTPAdapter(max_retries=max_retries))
-
-# 局部代理
-if Proxy:
-    proxies = {'http': Proxy, 'https': Proxy}
-else:
-    proxies = None
+session.headers = {"User-Agent": 'Gfriends_Inputer/' + version.replace('v', '')}
+session.proxies = proxies
 
 # 检查更新
 public_ip = None
@@ -832,7 +842,8 @@ try:
     # list_persons = [{'Name': '@YOU', 'ServerId': 'be208b8f79ed449aacf99a1a23530488', 'Id': '59932', 'Type': 'Person', 'ImageTags': {'Primary': '3ad658cbfb0173e14bb09d255e84d64a'}, 'BackdropImageTags': []}]
     gfriends_map = get_gfriends_map(repository_url)
     actor_log = open('./Getter/演员清单.txt', 'w', encoding="UTF-8", buffering=1)
-    actor_log.write('【演员清单】\n该清单仅供参考，下面可能还有导演、编剧、赞助商等其他人的名字，但是女友头像仓库只会收录日本女友。\n而已匹配到的头像则会根据个人配置，下载导入或会跳过\n\n')
+    actor_log.write(
+        '【演员清单】\n该清单仅供参考，下面可能还有导演、编剧、赞助商等其他人的名字，但是女友头像仓库只会收录日本女友。\n而已匹配到的头像则会根据个人配置，下载导入或会跳过\n\n')
 
     logger.info('引擎初始化')
     rewriteable_word('>> 引擎初始化...')
@@ -935,7 +946,8 @@ try:
             for actor_name, link in link_dict.items():
                 try:
                     if Conflict_Proc == 1 and not quiet_flag:
-                        bar.text('正在下载：' + re.sub(r'（.*）', '', actor_name) + ' [' + str(len(link)) + '枚]') if '（' in actor_name else bar.text(
+                        bar.text('正在下载：' + re.sub(r'（.*）', '', actor_name) + ' [' + str(
+                            len(link)) + '枚]') if '（' in actor_name else bar.text(
                             '正在下载：' + actor_name + ' [' + str(len(link)) + '枚]')
                     else:
                         bar.text('正在下载：' + re.sub(r'（.*）', '', actor_name)) if '（' in actor_name else bar.text(
@@ -1039,7 +1051,8 @@ try:
         logger.info('开始优化头像尺寸')
         with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
             for filename, pic_path in pic_path_dict.items():
-                bar.text('正在优化：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
+                bar.text(
+                    '正在优化：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
                     '正在优化：' +
                     filename.replace('.jpg', ''))
                 bar()
@@ -1075,7 +1088,8 @@ try:
                 input_avatar(url_post_img, b6_pic)
                 if Get_Intro == 1:
                     bar.text(
-                        '搜索信息：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
+                        '搜索信息：' + re.sub(r'（.*）', '', filename).replace('.jpg',
+                                                                            '')) if '（' in filename else bar.text(
                         '搜索信息：' + actorname)
                     xslist_search(actor_dict[actorname], actorname)
             proc_log.write(proc_md5 + '\n')
@@ -1103,7 +1117,8 @@ try:
     print('√ 导入完成  ')
     print('\nEmby / Jellyfin 演职人员共 ' + str(len(list_persons)) + ' 人，其中 ' + str(num_exist) + ' 人之前已有头像')
     print('本次导入/更新头像 ' + str(num_suc) + ' 枚，还有 ' + str(num_fail) + ' 人没有头像\n')
-    logger.info('导入头像完成，成功/失败/存在/总数：' + str(num_suc) + str(num_fail) + str(num_exist) + str(len(list_persons)))
+    logger.info(
+        '导入头像完成，成功/失败/存在/总数：' + str(num_suc) + str(num_fail) + str(num_exist) + str(len(list_persons)))
     if not overwrite:
         print('-- 未开启覆盖已有头像，所以跳过了一些演员，详见 Getter 目录下的记录清单')
 except KeyboardInterrupt:
