@@ -121,8 +121,8 @@ def xslist_search(id, name):
                        'Tags': ['日本AV女优'],
                        'Overview': detial_info}
 
-        url_post = host_url + 'emby/Items/' + id + '?api_key=' + api_key
-        session.post(url_post, json=detial_json)
+        url_post = host_url + 'Items/' + id + '?api_key=' + api_key
+        session.post(url_post, json=detial_json, proxies=host_proxies)
         logger.debug(name + '个人信息已上传')
         return True
     except (KeyboardInterrupt, SystemExit):
@@ -170,12 +170,12 @@ def get_gfriends_map(repository_url):
             logger.error('连接 Gfriends 女友头像仓库超时：' + format_exc())
             print('× 连接 Gfriends 女友头像仓库超时，请检查网络连接\n')
             print('× 网络连接异常且重试 ' + str(max_retries) + ' 次失败')
-            print('× 请尝试开启全局代理或配置 HTTP 局部代理；若已开启代理，请检查其可用性')
+            print('× 请尝试开启全局代理或配置局部代理；若已开启代理，请检查其可用性')
             sys.exit()
         except:
             logger.error('连接 Gfriends 女友头像仓库失败：' + format_exc())
             print('× 网络连接异常且重试 ' + str(max_retries) + ' 次失败')
-            print('× 请尝试开启全局代理或配置 HTTP 局部代理；若已开启代理，请检查其可用性')
+            print('× 请尝试开启全局代理或配置局部代理；若已开启代理，请检查其可用性')
             sys.exit()
         if response.status_code == 429:
             logger.error('女友仓库返回了一个错误：429 请求过于频繁，请稍后再试')
@@ -311,6 +311,8 @@ def input_avatar(url, data):
 def del_avatar(id):
     url_post_img = host_url + 'Items/' + id + '/Images/Primary?api_key=' + api_key
     session.delete(url=url_post_img, proxies=host_proxies)
+    url_post_img = host_url + 'Items/' + id + '/Images/Backdrop?api_key=' + api_key
+    session.delete(url=url_post_img, proxies=host_proxies)
     # 重组请求json
     detial_json = {'ProviderIds': '',
                    'Taglines': [''],
@@ -318,7 +320,7 @@ def del_avatar(id):
                    'Tags': [''],
                    'Overview': ''}
     url_post = host_url + 'Items/' + id + '?api_key=' + api_key
-    session.post(url_post, json=detial_json)
+    session.post(url_post, json=detial_json, proxies=host_proxies)
 
 def get_gfriends_link(name):
     if name in gfriends_map:
@@ -523,13 +525,15 @@ BD_API_Key =
 BD_Secret_Key = 
 
 [调试功能]
-### 删除所有头像 ###
-# 删除媒体服务器中所有演员的头像
+### 删除所有演员头像及演员元数据 ###
+# 支持删除的头像：Primary / Backdrop(通常由 MDCx 导入)
+# 支持删除的元数据：ProviderIds / Taglines / Genres / Tags / Overview
+# 删除操作不可逆
 DEL_ALL = 否
 
 ### DEBUG 调试模式 ###
 # 等价于使用 --debug 参数启动程序，开启后会拖慢程序运行速度。
-# 仅用于调试，提交 issue 前请检查并上传 DEBUG 日志文件。
+# 提交 issue 前请检查并上传 DEBUG 日志文件。
 DeBug = 否
 
 ### 配置文件版本 ###
@@ -541,14 +545,11 @@ Version = '''
         sys.exit()
 
 
-def read_persons(host_url, api_key, emby_flag):
+def read_persons(host_url, api_key):
     rewriteable_word('>> 连接 Emby / Jellyfin 服务器...')
-    if emby_flag:
-        host_url_persons = host_url + 'emby/Persons?api_key=' + api_key  # &PersonTypes=Actor
-    else:
-        host_url_persons = host_url + 'jellyfin/Persons?api_key=' + api_key  # &PersonTypes=Actor
+    host_url_persons = host_url + 'Persons?api_key=' + api_key  # &PersonTypes=Actor
     try:
-        rqs_emby = session.get(url=host_url_persons, proxies=host_proxies, timeout=30, verify=False)
+        rqs_emby = session.get(url=host_url_persons, proxies=host_proxies, timeout=60, verify=False)
     except requests.exceptions.ConnectionError:
         logger.error('连接 Emby / Jellyfin 服务器失败：' + public_ip + format_exc())
         print('× 连接 Emby / Jellyfin 服务器失败，请检查地址是否正确：', host_url, '\n')
@@ -565,15 +566,11 @@ def read_persons(host_url, api_key, emby_flag):
         logger.error('Emby / Jellyfin 返回：401 API 未授权')
         print('× 无权访问 Emby / Jellyfin 服务器，请检查 API 密匙是否正确\n')
         sys.exit()
-    if rqs_emby.status_code == 404 and emby_flag:
-        logger.warning('Emby / Jellyfin 返回：404 API 未找到，尝试切换备选 API')
-        rewriteable_word('>> 可能是新版 Jellyfin，尝试重新连接...')
-        return read_persons(host_url, api_key, False)
-    elif rqs_emby.status_code == 404 and not emby_flag:
+    elif rqs_emby.status_code == 404:
         logger.error('Emby / Jellyfin 返回 404 API 未找到，且备选 API 亦无效')
         print('× 尝试读取 Emby / Jellyfin 演员列表但是未找到，可能是未适配的版本：', host_url, '\n')
         sys.exit()
-    if rqs_emby.status_code != 200:
+    elif rqs_emby.status_code != 200:
         logger.error('Emby / Jellyfin 返回：' + str(rqs_emby.status_code))
         print('× 连接 Emby / Jellyfin 服务器成功，但是服务器内部错误：' + str(rqs_emby.status_code))
         sys.exit()
@@ -585,7 +582,7 @@ def read_persons(host_url, api_key, emby_flag):
         logger.info('连接 Emby / Jellyfin 服务器成功，包含演员：' + str(len(output)))
         print('√ 连接 Emby / Jellyfin 服务器成功')
         print('   演职人员：' + str(len(output)) + '人\n')
-        return output, emby_flag
+        return output
     except:
         logger.error('Emby / Jellyfin 的响应无法解析为 Json：' + rqs_emby.headers['Content-Type'])
         print('× 连接 Emby / Jellyfin 服务器成功，但是服务器的演员列表不能识别：' + rqs_emby.headers['Content-Type'])
@@ -604,7 +601,7 @@ def rewriteable_word(word):
 
 def del_all():
     print('【调试模式】删除所有头像及信息\n')
-    (list_persons, emby_flag) = read_persons(host_url, api_key, True)
+    list_persons = read_persons(host_url, api_key)
     rewriteable_word('按任意键开始...')
     os.system('pause>nul') if WINOS else input('Press Enter to start...')
     with alive_bar(len(list_persons), enrich_print=False, dual_line=True) as bar:
@@ -842,7 +839,7 @@ else:
         print('已配置局部代理 ' + Proxy + '，但似乎无法连通，请检查其格式和可用性\n')
 
 try:
-    (list_persons, emby_flag) = read_persons(host_url, api_key, True)
+    list_persons = read_persons(host_url, api_key, True)
     # list_persons = [{'Name': '@YOU', 'ServerId': 'be208b8f79ed449aacf99a1a23530488', 'Id': '59932', 'Type': 'Person', 'ImageTags': {'Primary': '3ad658cbfb0173e14bb09d255e84d64a'}, 'BackdropImageTags': []}]
     gfriends_map = get_gfriends_map(repository_url)
     actor_log = open('./Getter/演员清单.txt', 'w', encoding="UTF-8", buffering=1)
@@ -973,7 +970,7 @@ try:
                     with bar.pause():
                         logger.warning('网络连接异常，下载失败：' + str(actor_name) + format_exc())
                         print('× 网络连接异常且重试 ' + str(max_retries) + ' 次失败')
-                        print('× 请尝试开启全局代理或配置 HTTP 局部代理；若已开启代理，请检查其可用性')
+                        print('× 请尝试开启全局代理或配置局部代理；若已开启代理，请检查其可用性')
                         print('× 按任意键继续运行则跳过下载这些头像：' + str(actor_name) + '\n')
                         os.system('pause>nul') if WINOS else input()
                     continue
@@ -1083,12 +1080,7 @@ try:
             if not proc_flag or (proc_flag and not proc_md5 in proc_list):
                 with open(pic_path, 'rb') as pic_bit:
                     b6_pic = b64encode(pic_bit.read())
-                if emby_flag:
-                    url_post_img = host_url + 'emby/Items/' + actor_dict[
-                        actorname] + '/Images/Primary?api_key=' + api_key
-                else:
-                    url_post_img = host_url + 'jellyfin/Items/' + actor_dict[
-                        actorname] + '/Images/Primary?api_key=' + api_key
+                url_post_img = host_url + 'Items/' + actor_dict[actorname] + '/Images/Primary?api_key=' + api_key
                 input_avatar(url_post_img, b6_pic)
                 if Get_Intro == 1:
                     bar.text(
