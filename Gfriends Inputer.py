@@ -2,8 +2,8 @@
 # Gfriends Inputer / 女友头像仓库导入工具
 # Licensed under the MIT license.
 # Designed by xinxin8816, many thanks for junerain123, ddd354, moyy996.
-version = 'v3.02'
-compatible_conf_version = ['v3.00', 'v3.01', 'v3.02']
+version = 'v3.03'
+compatible_conf_version = ['v3.00', 'v3.01', 'v3.02', 'v3.03']
 
 import requests, os, io, sys, time, re, threading, argparse, logging
 from alive_progress import alive_bar
@@ -115,7 +115,7 @@ def xslist_search(id, name):
 
         # 重组请求json
         detial_json = {'Name': name,
-                       'ProviderIds': 'XSlist got by gfriends:' + detial_url,
+                       'ProviderIds': 'Gfriends ' + detial_url,
                        'Taglines': ['日本AV女优'],
                        'Genres': [],
                        'Tags': ['日本AV女优'],
@@ -329,9 +329,11 @@ def argparse_function(ver: str) -> [str, str, bool]:
                         help="Assume Yes on all queries and Print logs to file.")
     parser.add_argument("--skip-update", dest='updateflag', action="store_false",
                         help="Skip update check and try to exec old version.")
+    parser.add_argument("--debug", dest='debugflag', action="store_true",
+                        help="Debug log, same as debug option in config.")
     parser.add_argument("-v", "--version", action="version", version=ver)
     args = parser.parse_args()
-    return args.config, args.quietflag, args.updateflag
+    return args.config, args.quietflag, args.updateflag, args.debugflag
 
 
 def read_config(config_file):
@@ -364,7 +366,7 @@ def read_config(config_file):
             BD_VIP = config_settings.get("导入设置", "BD_VIP")
             overwrite = config_settings.getint("导入设置", "OverWrite")
             aifix = True if config_settings.get("下载设置", "AI_Fix") == '是' else False
-            debug = True if config_settings.get("调试功能", "DeBug") == '是' else False
+            debug = True if config_settings.get("调试功能", "DeBug") == '是' or debugflag else False
             deleteall = True if config_settings.get("调试功能", "DEL_ALL") == '是' else False
             fixsize = config_settings.getint("导入设置", "Size_Fix")
             '''
@@ -517,9 +519,9 @@ BD_Secret_Key =
 # 删除媒体服务器中所有演员的头像
 DEL_ALL = 否
 
-### DEBUG 输出详尽错误 ###
+### DEBUG 调试模式 ###
+# 等价于使用 --debug 参数启动程序，开启后会拖慢程序运行速度。
 # 仅用于调试，提交 issue 前请检查并上传 DEBUG 日志文件。
-# 开启后会拖慢程序运行速度。
 DeBug = 否
 
 ### 配置文件版本 ###
@@ -753,13 +755,13 @@ else:
         os.chdir(config_path)  # 切换工作目录
     logger.debug('修正运行目录：' + config_path + ':' + work_path)
 
-(config_file, quiet_flag, update_flag) = argparse_function(version)
+(config_file, quiet_flag, update_flag, debugflag) = argparse_function(version)
 # if quiet_flag:
 #   sys.stdout = open("./Getter/quiet.log", "w", buffering=1)
 (repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy, aifix, debug, deleteall,
  download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP, Get_Intro,
- Conflict_Proc) = read_config(
-    config_file)
+ Conflict_Proc) = read_config(config_file)
+del debugflag, config_file
 
 # 根据配置修改日志记录器属性
 logger = logging.getLogger()
