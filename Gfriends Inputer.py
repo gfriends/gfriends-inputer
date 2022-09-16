@@ -790,8 +790,8 @@ else:
 
 # 持久会话
 session = requests.Session()
-session.mount('http://', requests.adapters.HTTPAdapter(max_retries=max_retries))
-session.mount('https://', requests.adapters.HTTPAdapter(max_retries=max_retries))
+session.mount('http://', requests.adapters.HTTPAdapter(max_retries=max_retries, pool_connections=100, pool_maxsize=100))
+session.mount('https://', requests.adapters.HTTPAdapter(max_retries=max_retries, pool_connections=100, pool_maxsize=100))
 session.headers = {"User-Agent": 'Gfriends_Inputer/' + version.replace('v', '')}
 session.proxies = proxies
 
@@ -883,6 +883,7 @@ try:
         actor_dict[actor_name] = actor_id
     actor_log.close()
 
+    # 增量更新逻辑
     if overwrite == 2 and not Conflict_Proc:
         md5_host_url = md5(host_url.encode('UTF-8')).hexdigest()[14:-14]
         if os.path.exists('./Getter/down' + md5_host_url + '.log'):  # 有下载记录，则逐行读取记录
@@ -1018,75 +1019,69 @@ try:
                     pic_path_dict[filename] = file_path
     logger.info('本地头像目录构建完成')
 
-    if not pic_path_dict:
-        proc_log.close()
-        os.remove('./Getter/proc.tmp')
-        if overwrite == 2 and not Conflict_Proc:
-            down_log = open('./Getter/down' + md5_host_url + '.log', 'w', encoding="UTF-8")
-            down_log.write(
-                '## Gfriends Inputer 导入记录 ##\n## 请注意：删除本文件会导致服务器 ' + host_url + ' 的增量更新功能重置\n' + md5_config + '\n')
-            for key, value in inputed_dict.items():
-                down_log.write(key + '|' + value + '\n')
-            down_log.close()
-        print('\n√ 没有需要导入的头像')
-        logger.info('没有需要导入的头像')
-        if WINOS and not quiet_flag: print('\n按任意键退出程序...'); os.system('pause>nul')
-        os._exit(0)
+    if pic_path_dict:
+        if fixsize:
+            print('\n>> 尺寸优化...')
+            logger.info('开始优化头像尺寸')
+            with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
+                for filename, pic_path in pic_path_dict.items():
+                    bar.text(
+                        '正在优化：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
+                        '正在优化：' +
+                        filename.replace('.jpg', ''))
+                    bar()
+                    proc_md5 = md5((filename + '+2').encode('UTF-8')).hexdigest()[13:-13]
+                    if not proc_flag or (proc_flag and not proc_md5 in proc_list):
+                        result = fix_size(fixsize, pic_path)
+                        if not result: pic_path_dict.pop(filename)
+                    proc_log.write(proc_md5 + '\n')
+            print('√ 优化完成  ')
+            logger.info('尺寸优化完成')
+        else:
+            logger.info('未开启头像尺寸优化')
 
-    if fixsize:
-        print('\n>> 尺寸优化...')
-        logger.info('开始优化头像尺寸')
+        print('\n>> 导入头像...')
+        logger.info('导入头像')
         with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
             for filename, pic_path in pic_path_dict.items():
-                bar.text(
-                    '正在优化：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
-                    '正在优化：' +
-                    filename.replace('.jpg', ''))
+                actorname = filename.replace('.jpg', '')
+                actorname = re.sub(r'1-\d+', '', actorname)
+                bar.text('正在导入：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
+                    '正在导入：' + actorname)
                 bar()
-                proc_md5 = md5((filename + '+2').encode('UTF-8')).hexdigest()[13:-13]
+                proc_md5 = md5((filename + '+3').encode('UTF-8')).hexdigest()[13:-13]
                 if not proc_flag or (proc_flag and not proc_md5 in proc_list):
-                    result = fix_size(fixsize, pic_path)
-                    if not result: pic_path_dict.pop(filename)
+                    with open(pic_path, 'rb') as pic_bit:
+                        b6_pic = b64encode(pic_bit.read())
+                    url_post_img = host_url + 'Items/' + actor_dict[actorname] + '/Images/Primary?api_key=' + api_key
+                    input_avatar(url_post_img, b6_pic)
+                    if Get_Intro == 1:
+                        bar.text(
+                            '搜索信息：' + re.sub(r'（.*）', '', filename).replace('.jpg',
+                                                                                '')) if '（' in filename else bar.text(
+                            '搜索信息：' + actorname)
+                        xslist_search(actor_dict[actorname], actorname)
                 proc_log.write(proc_md5 + '\n')
-        print('√ 优化完成  ')
-        logger.info('尺寸优化完成')
-    else:
-        logger.info('未开启头像尺寸优化')
-
-    print('\n>> 导入头像...')
-    logger.info('导入头像')
-    with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
-        for filename, pic_path in pic_path_dict.items():
-            actorname = filename.replace('.jpg', '')
-            actorname = re.sub(r'1-\d+', '', actorname)
-            bar.text('正在导入：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
-                '正在导入：' + actorname)
-            bar()
-            proc_md5 = md5((filename + '+3').encode('UTF-8')).hexdigest()[13:-13]
-            if not proc_flag or (proc_flag and not proc_md5 in proc_list):
-                with open(pic_path, 'rb') as pic_bit:
-                    b6_pic = b64encode(pic_bit.read())
-                url_post_img = host_url + 'Items/' + actor_dict[actorname] + '/Images/Primary?api_key=' + api_key
-                input_avatar(url_post_img, b6_pic)
-                if Get_Intro == 1:
-                    bar.text(
-                        '搜索信息：' + re.sub(r'（.*）', '', filename).replace('.jpg',
-                                                                            '')) if '（' in filename else bar.text(
-                        '搜索信息：' + actorname)
-                    xslist_search(actor_dict[actorname], actorname)
-            proc_log.write(proc_md5 + '\n')
-            while True:
-                if threading.activeCount() > max_upload_connect + 1:
-                    time.sleep(0.01)
-                else:
-                    break
-            num_suc += 1
-    rewriteable_word('>> 即将完成')
-    for thr_status in threading.enumerate():  # 等待子线程运行结束
-        try:
-            thr_status.join()
-        except RuntimeError:
-            continue
+                while True:
+                    if threading.activeCount() > max_upload_connect + 1:
+                        time.sleep(0.01)
+                    else:
+                        break
+                num_suc += 1
+        rewriteable_word('>> 即将完成')
+        for thr_status in threading.enumerate():  # 等待子线程运行结束
+            try:
+                thr_status.join()
+            except RuntimeError:
+                continue
+        print('√ 导入完成  ')
+        print('\nEmby / Jellyfin 演职人员共 ' + str(len(list_persons)) + ' 人，其中 ' + str(num_exist) + ' 人之前已有头像')
+        print('本次导入/更新头像 ' + str(num_suc) + ' 枚，还有 ' + str(num_fail) + ' 人没有头像\n')
+        logger.info(
+            '导入头像完成，成功/失败/存在/总数：' + str(num_suc) + '/' + str(num_fail) + '/' + str(num_exist) + '/' + str(
+                len(list_persons)))
+        if not overwrite:
+            print('-- 未开启覆盖已有头像，所以跳过了一些演员，详见 Getter 目录下的记录清单')
     proc_log.close()
     os.remove('./Getter/proc.tmp')
     if overwrite == 2 and not Conflict_Proc:
@@ -1096,14 +1091,9 @@ try:
         for key, value in inputed_dict.items():
             down_log.write(key + '|' + value + '\n')
         down_log.close()
-    print('√ 导入完成  ')
-    print('\nEmby / Jellyfin 演职人员共 ' + str(len(list_persons)) + ' 人，其中 ' + str(num_exist) + ' 人之前已有头像')
-    print('本次导入/更新头像 ' + str(num_suc) + ' 枚，还有 ' + str(num_fail) + ' 人没有头像\n')
-    logger.info(
-        '导入头像完成，成功/失败/存在/总数：' + str(num_suc) + '/' + str(num_fail) + '/' + str(num_exist) + '/' + str(
-            len(list_persons)))
-    if not overwrite:
-        print('-- 未开启覆盖已有头像，所以跳过了一些演员，详见 Getter 目录下的记录清单')
+    else:
+        print('\n√ 没有需要导入的头像')
+        logger.info('没有需要导入的头像')
 except KeyboardInterrupt:
     logger.info('用户强制停止')
     print('× 用户强制停止')
