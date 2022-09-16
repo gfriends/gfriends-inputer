@@ -45,7 +45,7 @@ def fix_size(type, path):
                         if BD_VIP == '否':
                             time.sleep(0.2)  # 免费用户QPS≈2，排除网络延迟及性能损耗时间，此值可以稍降低
                         else:
-                            time.sleep(1 / int(1.1 * BD_VIP))
+                            time.sleep(1 / 1.1 * int(BD_VIP))
                     if x_nose + 1 / 3 * hf > wf:  # 判断鼻子在图整体的位置
                         x_left = wf - 2 / 3 * hf  # 以右为边
                     elif x_nose - 1 / 3 * hf < 0:
@@ -231,25 +231,18 @@ def asyncc(f):
     return wrapper
 
 
-@asyncc
+# @asyncc
 def check_avatar(url, actor_name, proc_md5):
     try:
         if actor_name in exist_list:  # 没有头像的演员跳过检测
             actor_md5 = md5(actor_name.encode('UTF-8')).hexdigest()[12:-12]
             if actor_md5 in inputed_dict:  # 没有下载过的演员跳过检测
-                gfriends_response = session.head(url, timeout=1)
-                if inputed_dict[actor_md5] == gfriends_response.headers['Content-Length']:
+                mtime = re.search(r't=\d+', url)[0].replace('t=', '')
+                if inputed_dict[actor_md5] == mtime:
                     del link_dict[actor_name]
                     logger.debug(actor_name + '头像无需更新。')
-        # else:
-        # inputed_dict[actor_md5] = gfriends_response.headers['Content-Length']
-        # else: # 有头像的演员先不保存日志，避免二次请求
-        # inputed_dict[actor_md5] = gfriends_response.headers['Content-Length']
         proc_log.write(proc_md5 + '\n')
         logger.debug(actor_name + '头像更新检查成功，需要下载新头像。')
-    except requests.exceptions.ConnectTimeout:
-        logger.warning(actor_name + '头像更新检查超时，可能是网络不稳定。')
-        print('!! ' + actor_name + ' 头像更新检查超时，可能是网络不稳定。')
     except:
         logger.warning(actor_name + '头像更新检查失败：' + format_exc())
         print('!! ' + actor_name + ' 头像更新检查失败。')
@@ -292,7 +285,8 @@ def download_avatar(url, actor_name, proc_md5):
             code.write(gfriends_response.content)
         logger.debug(pic_path + ' 下载成功')
         actor_md5 = md5(actor_name.encode('UTF-8')).hexdigest()[12:-12]
-        inputed_dict[actor_md5] = gfriends_response.headers['Content-Length']  # 写入图片版本日志
+        mtime = re.search(r't=\d+', url)[0].replace('t=', '')
+        inputed_dict[actor_md5] = mtime  # 写入图片版本日志
         proc_log.write(proc_md5 + '\n')
 
 
@@ -321,6 +315,7 @@ def del_avatar(id):
                    'Overview': ''}
     url_post = host_url + 'Items/' + id + '?api_key=' + api_key
     session.post(url_post, json=detial_json, proxies=host_proxies)
+
 
 def get_gfriends_link(name):
     if name in gfriends_map:
@@ -551,11 +546,11 @@ def read_persons(host_url, api_key):
     try:
         rqs_emby = session.get(url=host_url_persons, proxies=host_proxies, timeout=60, verify=False)
     except requests.exceptions.ConnectionError:
-        logger.error('连接 Emby / Jellyfin 服务器失败：' + public_ip + format_exc())
+        logger.error('连接 Emby / Jellyfin 服务器失败：' + host_url_persons + format_exc())
         print('× 连接 Emby / Jellyfin 服务器失败，请检查地址是否正确：', host_url_persons, '\n')
         sys.exit()
     except requests.exceptions.RequestException:
-        logger.error('连接 Emby / Jellyfin 服务器超时：' + public_ip + format_exc())
+        logger.error('连接 Emby / Jellyfin 服务器超时：' + host_url_persons + format_exc())
         print('× 连接 Emby / Jellyfin 服务器超时，请检查地址是否正确：', host_url_persons, '\n')
         sys.exit()
     except:
@@ -780,17 +775,18 @@ if Proxy:
     proxies = host_proxies = {'http': Proxy, 'https': Proxy}
     # 根据 IP 判断内网服务器
     if re.search(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", host_url):
-        ip = reduce(lambda x, y: (x << 8) + y, map(int, re.search(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", host_url)[0].split('.')))
+        ip = reduce(lambda x, y: (x << 8) + y,
+                    map(int, re.search(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", host_url)[0].split('.')))
         net_a = reduce(lambda x, y: (x << 8) + y, map(int, '10.255.255.255'.split('.'))) >> 24
         net_b = reduce(lambda x, y: (x << 8) + y, map(int, '172.31.255.255'.split('.'))) >> 20
         net_c = reduce(lambda x, y: (x << 8) + y, map(int, '192.168.255.255'.split('.'))) >> 16
         if ip >> 24 == net_a or ip >> 20 == net_b or ip >> 16 == net_c:
             host_proxies = {'http': None, 'https': None}
-        del net_a,net_b,net_c,ip
+        del net_a, net_b, net_c, ip
     elif 'localhost' in host_url:
         host_proxies = {'http': None, 'https': None}
 else:
-    proxies = host_proxies= None
+    proxies = host_proxies = None
 
 # 持久会话
 session = requests.Session()
@@ -839,7 +835,7 @@ else:
         print('已配置局部代理 ' + Proxy + '，但似乎无法连通，请检查其格式和可用性\n')
 
 try:
-    list_persons = read_persons(host_url, api_key, True)
+    list_persons = read_persons(host_url, api_key)
     # list_persons = [{'Name': '@YOU', 'ServerId': 'be208b8f79ed449aacf99a1a23530488', 'Id': '59932', 'Type': 'Person', 'ImageTags': {'Primary': '3ad658cbfb0173e14bb09d255e84d64a'}, 'BackdropImageTags': []}]
     gfriends_map = get_gfriends_map(repository_url)
     actor_log = open('./Getter/演员清单.txt', 'w', encoding="UTF-8", buffering=1)
@@ -907,28 +903,18 @@ try:
 
         for index, actor_name in enumerate(list(link_dict)):  # 有删除字典的操作，不能直接遍历字典
             try:
-                if WINOS and not quiet_flag and index % 5 == 0:
-                    rewriteable_word('>> 引擎初始化... ' + str(index) + '/' + str(len(list(link_dict))))
+                # if WINOS and not quiet_flag and index % 5 == 0:
+                #    rewriteable_word('>> 引擎初始化... ' + str(index) + '/' + str(len(list(link_dict))))
                 proc_md5 = md5((actor_name + '+0').encode('UTF-8')).hexdigest()[13:-13]
                 if not proc_flag or (proc_flag and not proc_md5 in proc_list):
                     check_avatar(link_dict[actor_name], actor_name, proc_md5)  # 记录检查完成的操作放到子线程中，以防没下完中断的断点没记录到
                 else:
                     proc_log.write(proc_md5 + '\n')
-                while True:
-                    if threading.activeCount() > 10 * max_download_connect + 1:
-                        time.sleep(0.01)
-                    else:
-                        break
             except KeyboardInterrupt:
                 sys.exit()
             except:
-                logger.warning('网络连接异常，跳过检查：' + str(actor_name) + format_exc())
-                print('× 网络连接异常，跳过检查：' + str(actor_name) + '\n')
-                continue
-        for thr_status in threading.enumerate():  # 等待子线程运行结束
-            try:
-                thr_status.join()
-            except RuntimeError:
+                logger.warning('跳过检查：' + str(actor_name) + format_exc())
+                print('× 跳过检查：' + str(actor_name) + '\n')
                 continue
     if proc_flag:
         print('√ 引擎初始化成功，尝试从上次中断位置继续')
@@ -998,7 +984,7 @@ try:
         temp_list = []
         for filename in reversed(files):
             actorname = filename.replace('.jpg', '')
-            actorname = re.sub(r'\-\d+', '', actorname)
+            actorname = re.sub(r'-\d+', '', actorname)
             if '.jpg' in filename and actorname in actor_dict and actorname not in temp_list:
                 pic_path_dict[filename] = os.path.join(download_path, filename)
                 temp_list.append(actorname)
@@ -1072,7 +1058,7 @@ try:
     with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
         for filename, pic_path in pic_path_dict.items():
             actorname = filename.replace('.jpg', '')
-            actorname = re.sub(r'1\-\d+', '', actorname)
+            actorname = re.sub(r'1-\d+', '', actorname)
             bar.text('正在导入：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
                 '正在导入：' + actorname)
             bar()
@@ -1114,7 +1100,8 @@ try:
     print('\nEmby / Jellyfin 演职人员共 ' + str(len(list_persons)) + ' 人，其中 ' + str(num_exist) + ' 人之前已有头像')
     print('本次导入/更新头像 ' + str(num_suc) + ' 枚，还有 ' + str(num_fail) + ' 人没有头像\n')
     logger.info(
-        '导入头像完成，成功/失败/存在/总数：' + str(num_suc) + '/' + str(num_fail) + '/' + str(num_exist) + '/' + str(len(list_persons)))
+        '导入头像完成，成功/失败/存在/总数：' + str(num_suc) + '/' + str(num_fail) + '/' + str(num_exist) + '/' + str(
+            len(list_persons)))
     if not overwrite:
         print('-- 未开启覆盖已有头像，所以跳过了一些演员，详见 Getter 目录下的记录清单')
 except KeyboardInterrupt:
