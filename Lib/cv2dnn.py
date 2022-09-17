@@ -1,11 +1,12 @@
 import os, logging
-import cv2
-import numpy as np
 from PIL import Image
 from traceback import format_exc
 
 logger = logging.getLogger()
 try:
+    import cv2
+    import numpy as np
+
     # Load a model stored in Caffe
     # opencv_dnn_model = cv2.dnn.readNetFromCaffe("./Lib/deploy.prototxt",
     #                                              "./Lib/res10_300x300_ssd_iter_140000_fp16.caffemodel")
@@ -17,24 +18,25 @@ try:
         opencv_dnn_model = cv2.dnn.readNetFromTensorflow(pb_path, pbtxt_path)
         logger.info('OpenCV 初始化成功')
     else:
-        logger.warning('OpenCV 初始化失败：Lib库文件缺失。')
-        print('OpenCV 初始化失败：Lib库文件缺失。')
-        print('请重新下载程序，否则强制继续运行可能引发异常。')
+        logger.warning('OpenCV 初始化失败：Lib 库文件缺失。')
+        print('OpenCV 初始化失败：Lib 库文件缺失。')
+        print('建议重新下载程序，强制运行可能引发异常。')
         input('Press Enter to continue...')
 except cv2.error:
-    logger.warning('OpenCV 初始化失败：' + format_exc().replace('\n',''))
-    print('OpenCV 初始化失败，这通常是由于Lib库文件缺失导致的，极小概率几率是CPU不兼容。')
-    print('请重新下载程序或关闭本地AI功能，否则强制继续运行可能引发异常。')
+    logger.warning('OpenCV 初始化失败：' + format_exc().replace('\n', ''))
+    print('OpenCV 初始化失败，有可能是 CPU 或系统不兼容。')
+    print('建议重新下载程序或关闭本地 AI 功能，强制运行可能引发异常。')
     input('Press Enter to continue...')
 
+
 def find_faces(img):
-    # 传递路径：等效于 cv2.imread，但增加了支持中文名支持，仅支持 RGB 图像；np.fromfile 读取为数组，cv2.imdecode 解码为图像
+    # 传递路径：等效于 cv2.imread，但支持文件名中文，仅支持 RGB 图像；np.fromfile 读取为数组，cv2.imdecode 解码为图像
     # img = np.fromfile(path, dtype=np.uint8)
     # img = cv2.imdecode(img, -1)
 
     # 传递二进制 RGB 图像：np.array 进行图像序列化，数列翻转转换为 BGR 图像
     img = np.array(img)
-    img = img[:, :, ::-1] # RGB to BGR
+    img = img[:, :, ::-1]  # RGB to BGR
 
     # Perform the required pre-processings on the image and create a 4D blob from image.
     # Resize the image and apply mean subtraction to its channels
@@ -69,12 +71,14 @@ def find_faces(img):
             # cv2.circle(img, (int(0.5 * x1 + 0.5 * x2), int(0.5 * y1 + 0.5 * y2)), 10, (0, 255, 0), 2)
 
             # return nose position x,y
-            return 0.5 * x1 + 0.5 * x2, 0.5 * y1 + 0.5 * y2
+            return 0.5 * (x1 + x2), 0.5 * (y1 + y2)
         else:
-            return 0, 0
+            # return center position
+            return 0.5 * image_width, 0.5 * image_height
     # cv2.imshow('Result', img)
 
-# test code
+
+# Testing code
 '''
 for filename in os.listdir("./Downloads"):
     if 'jpg' in filename:

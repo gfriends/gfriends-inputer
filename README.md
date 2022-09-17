@@ -36,8 +36,9 @@ CLI 命令: "Gfriends Inputer" [-h] [-c [CONFIG]] [-q] [-v]
   -c [CONFIG], --config [CONFIG]
                         指定配置文件路径，默认为运行目录。
   -h, --help            显示本帮助信息。
-  -q, --quiet           静默模式运行，不输出任何信息。
+  -q, --quiet           开启静默模式，不打印任何信息。
   --skip-update         跳过更新检查，强制运行旧版本。
+  --debug               输出调试日志，即使配置文件未开启调试模式。
   -v, --version         显示当前版本。
 ```
 

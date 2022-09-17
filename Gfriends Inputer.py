@@ -2,13 +2,14 @@
 # Gfriends Inputer / 女友头像仓库导入工具
 # Licensed under the MIT license.
 # Designed by xinxin8816, many thanks for junerain123, ddd354, moyy996.
-version = 'v3.02'
-compatible_conf_version = ['v3.00', 'v3.01', 'v3.02']
+version = 'v3.03'
+compatible_conf_version = ['v3.00', 'v3.01', 'v3.02', 'v3.03']
 
 import requests, os, io, sys, time, re, threading, argparse, logging
 from alive_progress import alive_bar
 from configparser import RawConfigParser
 from traceback import format_exc
+from functools import reduce
 from hashlib import md5
 from base64 import b64encode
 from json import loads
@@ -44,7 +45,7 @@ def fix_size(type, path):
                         if BD_VIP == '否':
                             time.sleep(0.2)  # 免费用户QPS≈2，排除网络延迟及性能损耗时间，此值可以稍降低
                         else:
-                            time.sleep(1 / int(1.1 * BD_VIP))
+                            time.sleep(1 / 1.1 * int(BD_VIP))
                     if x_nose + 1 / 3 * hf > wf:  # 判断鼻子在图整体的位置
                         x_left = wf - 2 / 3 * hf  # 以右为边
                     elif x_nose - 1 / 3 * hf < 0:
@@ -86,7 +87,7 @@ def xslist_search(id, name):
     try:
         # 搜索
         url = "https://xslist.org/search?lg=zh&query=" + name
-        response = session.get(url, proxies=proxies, timeout=10)
+        response = session.get(url, timeout=10)
         html = etree.HTML(response.text)
         try:
             detial_url = html.xpath('/html/body/ul/li/h3/a/@href')[0]
@@ -96,7 +97,7 @@ def xslist_search(id, name):
             return False
 
         # 获取详情页
-        response = session.get(detial_url, proxies=proxies, timeout=10)
+        response = session.get(detial_url, timeout=10)
         html = etree.HTML(response.text)
         try:
             detial_list = html.xpath('/html/body/div[1]/div[3]/div/p[1]/descendant-or-self::text()')
@@ -114,12 +115,14 @@ def xslist_search(id, name):
 
         # 重组请求json
         detial_json = {'Name': name,
-                       'ProviderIds': 'XSlist got by gfriends:' + detial_url,
+                       'ProviderIds': 'Gfriends ' + detial_url,
                        'Taglines': ['日本AV女优'],
+                       'Genres': [],
+                       'Tags': ['日本AV女优'],
                        'Overview': detial_info}
 
-        url_post = host_url + 'emby/Items/' + id + '?api_key=' + api_key
-        session.post(url_post, json=detial_json, proxies=proxies)
+        url_post = host_url + 'Items/' + id + '?api_key=' + api_key
+        session.post(url_post, json=detial_json, proxies=host_proxies)
         logger.debug(name + '个人信息已上传')
         return True
     except (KeyboardInterrupt, SystemExit):
@@ -139,12 +142,16 @@ def get_gfriends_map(repository_url):
 
     # 检查文件树缓存
     keep_tree = False
-    if os.path.exists('./Getter/Filetree.json'):
-        # 加 deflate 请求以防压缩无法获取真实大小
-        gfriends_response = session.head(filetree_url, proxies=proxies, timeout=5,
-                                         headers={'Accept-Encoding': 'deflate'})
-        if os.path.getsize('./Getter/Filetree.json') == int(gfriends_response.headers['Content-Length']):
-            keep_tree = True
+    try:
+        if os.path.exists('./Getter/Filetree.json'):
+            # 加 deflate 请求以防压缩无法获取真实大小
+            gfriends_response = session.head(filetree_url, timeout=5,
+                                             headers={'Accept-Encoding': 'deflate'})
+            if os.path.getsize('./Getter/Filetree.json') == int(gfriends_response.headers['Content-Length']):
+                keep_tree = True
+    except:
+        logger.warning('检查文件树缓存失败：' + format_exc())
+        keep_tree = False
 
     if keep_tree:
         with open('./Getter/Filetree.json', 'r', encoding='utf-8') as json_file:
@@ -156,19 +163,19 @@ def get_gfriends_map(repository_url):
         logger.info('仓库文件树未更新，使用缓存')
     else:
         try:
-            response = session.get(filetree_url, proxies=proxies, timeout=30)
+            response = session.get(filetree_url, timeout=30)
             # 修复部分服务端返回 header 未指明编码使后续解析错误
             response.encoding = 'utf-8'
         except requests.exceptions.RequestException:
             logger.error('连接 Gfriends 女友头像仓库超时：' + format_exc())
             print('× 连接 Gfriends 女友头像仓库超时，请检查网络连接\n')
             print('× 网络连接异常且重试 ' + str(max_retries) + ' 次失败')
-            print('× 请尝试开启全局代理或配置 HTTP 局部代理；若已开启代理，请检查其可用性')
+            print('× 请尝试开启全局代理或配置局部代理；若已开启代理，请检查其可用性')
             sys.exit()
         except:
             logger.error('连接 Gfriends 女友头像仓库失败：' + format_exc())
             print('× 网络连接异常且重试 ' + str(max_retries) + ' 次失败')
-            print('× 请尝试开启全局代理或配置 HTTP 局部代理；若已开启代理，请检查其可用性')
+            print('× 请尝试开启全局代理或配置局部代理；若已开启代理，请检查其可用性')
             sys.exit()
         if response.status_code == 429:
             logger.error('女友仓库返回了一个错误：429 请求过于频繁，请稍后再试')
@@ -224,25 +231,18 @@ def asyncc(f):
     return wrapper
 
 
-@asyncc
+# @asyncc
 def check_avatar(url, actor_name, proc_md5):
     try:
         if actor_name in exist_list:  # 没有头像的演员跳过检测
             actor_md5 = md5(actor_name.encode('UTF-8')).hexdigest()[12:-12]
             if actor_md5 in inputed_dict:  # 没有下载过的演员跳过检测
-                gfriends_response = session.head(url, proxies=proxies, timeout=1)
-                if inputed_dict[actor_md5] == gfriends_response.headers['Content-Length']:
+                mtime = re.search(r't=\d+', url)[0].replace('t=', '')
+                if inputed_dict[actor_md5] == mtime:
                     del link_dict[actor_name]
                     logger.debug(actor_name + '头像无需更新。')
-        # else:
-        # inputed_dict[actor_md5] = gfriends_response.headers['Content-Length']
-        # else: # 有头像的演员先不保存日志，避免二次请求
-        # inputed_dict[actor_md5] = gfriends_response.headers['Content-Length']
         proc_log.write(proc_md5 + '\n')
         logger.debug(actor_name + '头像更新检查成功，需要下载新头像。')
-    except requests.exceptions.ConnectTimeout:
-        logger.warning(actor_name + '头像更新检查超时，可能是网络不稳定。')
-        print('!! ' + actor_name + ' 头像更新检查超时，可能是网络不稳定。')
     except:
         logger.warning(actor_name + '头像更新检查失败：' + format_exc())
         print('!! ' + actor_name + ' 头像更新检查失败。')
@@ -254,7 +254,7 @@ def download_avatar(url, actor_name, proc_md5):
         urls = url
         i = 1
         for url in urls:
-            gfriends_response = session.get(url, proxies=proxies)
+            gfriends_response = session.get(url)
             pic_path = download_path + actor_name + "-" + str(i) + ".jpg"
             if gfriends_response.status_code == 429:
                 logger.warning(pic_path + ' 下载失败，女友仓库返回：429 请求过快，请稍后再试')
@@ -270,7 +270,7 @@ def download_avatar(url, actor_name, proc_md5):
             logger.debug(pic_path + ' 下载成功')
             i += 1
     else:
-        gfriends_response = session.get(url, proxies=proxies)
+        gfriends_response = session.get(url)
         pic_path = download_path + actor_name + ".jpg"
         if gfriends_response.status_code == 429:
             logger.warning(pic_path + ' 下载失败，女友仓库返回：429 请求过快，请稍后再试')
@@ -285,25 +285,36 @@ def download_avatar(url, actor_name, proc_md5):
             code.write(gfriends_response.content)
         logger.debug(pic_path + ' 下载成功')
         actor_md5 = md5(actor_name.encode('UTF-8')).hexdigest()[12:-12]
-        inputed_dict[actor_md5] = gfriends_response.headers['Content-Length']  # 写入图片版本日志
+        mtime = re.search(r't=\d+', url)[0].replace('t=', '')
+        inputed_dict[actor_md5] = mtime  # 写入图片版本日志
         proc_log.write(proc_md5 + '\n')
 
 
 @asyncc
 def input_avatar(url, data):
     try:
-        session.post(url, data=data, headers={"Content-Type": 'image/jpeg',
-                                              "User-Agent": 'Gfriends_Inputer/' + version.replace('v', '')},
-                     proxies=proxies)
+        session.post(url, proxies=host_proxies, data=data, headers={"Content-Type": 'image/jpeg'})
         logger.debug(url.replace(host_url, '').replace(api_key, '***') + ' 导入成功。')
     except:
         logger.warning(url.replace(host_url, '').replace(api_key, '***') + ' 导入失败。' + format_exc())
-        print('!! ' + url.replace(host_url, '').replace(api_key, '***') + ' 导入失败，可能是与媒体服务器连接不稳定，请尝试降低导入线程数。')
+        print('!! ' + url.replace(host_url, '').replace(api_key,
+                                                        '***') + ' 导入失败，可能是与媒体服务器连接不稳定，请尝试降低导入线程数。')
 
 
 @asyncc
-def del_avatar(url_post_img):
-    session.delete(url=url_post_img, proxies=proxies)
+def del_avatar(id):
+    url_post_img = host_url + 'Items/' + id + '/Images/Primary?api_key=' + api_key
+    session.delete(url=url_post_img, proxies=host_proxies)
+    url_post_img = host_url + 'Items/' + id + '/Images/Backdrop?api_key=' + api_key
+    session.delete(url=url_post_img, proxies=host_proxies)
+    # 重组请求json
+    detial_json = {'ProviderIds': '',
+                   'Taglines': [''],
+                   'Genres': [''],
+                   'Tags': [''],
+                   'Overview': ''}
+    url_post = host_url + 'Items/' + id + '?api_key=' + api_key
+    session.post(url_post, json=detial_json, proxies=host_proxies)
 
 
 def get_gfriends_link(name):
@@ -323,9 +334,11 @@ def argparse_function(ver: str) -> [str, str, bool]:
                         help="Assume Yes on all queries and Print logs to file.")
     parser.add_argument("--skip-update", dest='updateflag', action="store_false",
                         help="Skip update check and try to exec old version.")
+    parser.add_argument("--debug", dest='debugflag', action="store_true",
+                        help="Debug log, same as debug option in config.")
     parser.add_argument("-v", "--version", action="version", version=ver)
     args = parser.parse_args()
-    return args.config, args.quietflag, args.updateflag
+    return args.config, args.quietflag, args.updateflag, args.debugflag
 
 
 def read_config(config_file):
@@ -358,7 +371,7 @@ def read_config(config_file):
             BD_VIP = config_settings.get("导入设置", "BD_VIP")
             overwrite = config_settings.getint("导入设置", "OverWrite")
             aifix = True if config_settings.get("下载设置", "AI_Fix") == '是' else False
-            debug = True if config_settings.get("调试功能", "DeBug") == '是' else False
+            debug = True if config_settings.get("调试功能", "DeBug") == '是' or debugflag else False
             deleteall = True if config_settings.get("调试功能", "DEL_ALL") == '是' else False
             fixsize = config_settings.getint("导入设置", "Size_Fix")
             '''
@@ -404,7 +417,7 @@ def read_config(config_file):
             if not os.path.exists(local_path):
                 os.makedirs(local_path)
                 write_txt(local_path + "/README.txt",
-                          '本目录自动生成，您可以存放自己收集的头像，这些头像将被优先导入服务器。\n\n请自行备份您收集头像的副本，根据个人配置不同，该目录文件可能会被程序修改。\n\n仅支持JPG格式，且请勿再创建子目录。\n\n如果您收集的头像位于子目录，可通过 Move To Here.bat（Only for Windows） 工具将其全部提取到根目录。')
+                          '本目录自动生成，您可以存放自己收集的头像（仅支持JPG格式），这些头像将被优先导入服务器。\n\n请自行备份您收集头像的副本，根据个人配置不同，该目录文件可能会被程序修改。')
             # 定义百度AI
             if fixsize == 3:
                 BD_AI_client = AipBodyAnalysis(BD_App_ID, BD_API_Key, BD_Secret_Key)
@@ -468,7 +481,8 @@ Proxy =
 
 [导入设置]
 ### 搜索女友个人信息 ###
-# 刮削演员信息并导入。为降低来源网站负载，暂时只能单线程，因此会拖慢导入速度。
+# 刮削演员信息并导入，使用演员日文原名效果最佳。
+# 为降低来源网站负载，暂时只能单线程，因此会拖慢导入速度。
 # 0 - 不搜索个人信息
 # 1 - 从 XSlist 获取个人信息
 Get_Intro = 0
@@ -507,13 +521,15 @@ BD_API_Key =
 BD_Secret_Key = 
 
 [调试功能]
-### 删除所有头像 ###
-# 删除媒体服务器中所有演员的头像
+### 删除所有演员头像及演员元数据 ###
+# 支持删除的头像：Primary / Backdrop(通常由 MDCx 导入)
+# 支持删除的元数据：ProviderIds / Taglines / Genres / Tags / Overview
+# 删除操作不可逆
 DEL_ALL = 否
 
-### DEBUG 输出详尽错误 ###
-# 仅用于调试，提交 issue 前请检查并上传 DEBUG 日志文件。
-# 开启后会拖慢程序运行速度。
+### DEBUG 调试模式 ###
+# 等价于使用 --debug 参数启动程序，开启后会拖慢程序运行速度。
+# 提交 issue 前请检查并上传 DEBUG 日志文件。
 DeBug = 否
 
 ### 配置文件版本 ###
@@ -525,41 +541,32 @@ Version = '''
         sys.exit()
 
 
-def read_persons(host_url, api_key, emby_flag):
+def read_persons(host_url, api_key):
     rewriteable_word('>> 连接 Emby / Jellyfin 服务器...')
-    if emby_flag:
-        host_url_persons = host_url + 'emby/Persons?api_key=' + api_key  # &PersonTypes=Actor
-    else:
-        host_url_persons = host_url + 'jellyfin/Persons?api_key=' + api_key  # &PersonTypes=Actor
+    host_url_persons = host_url + 'Persons?api_key=' + api_key  # &PersonTypes=Actor
     try:
-        rqs_emby = session.get(url=host_url_persons,
-                               headers={"User-Agent": 'Gfriends_Inputer/' + version.replace('v', '')},
-                               proxies=proxies, timeout=30, verify = False)
+        rqs_emby = session.get(url=host_url_persons, proxies=host_proxies, timeout=60, verify=False)
     except requests.exceptions.ConnectionError:
-        logger.error('连接 Emby / Jellyfin 服务器失败：' + public_ip + format_exc())
-        print('× 连接 Emby / Jellyfin 服务器失败，请检查地址是否正确：', host_url, '\n')
+        logger.error('连接 Emby / Jellyfin 服务器失败：' + host_url_persons + format_exc())
+        print('× 连接 Emby / Jellyfin 服务器失败，请检查地址是否正确：', host_url_persons, '\n')
         sys.exit()
     except requests.exceptions.RequestException:
-        logger.error('连接 Emby / Jellyfin 服务器超时：' + public_ip + format_exc())
-        print('× 连接 Emby / Jellyfin 服务器超时，请检查地址是否正确：', host_url, '\n')
+        logger.error('连接 Emby / Jellyfin 服务器超时：' + host_url_persons + format_exc())
+        print('× 连接 Emby / Jellyfin 服务器超时，请检查地址是否正确：', host_url_persons, '\n')
         sys.exit()
     except:
-        logger.error('连接 Emby / Jellyfin 服务器未知错误：' + host_url + format_exc())
-        print('× 连接 Emby / Jellyfin 服务器未知错误：', host_url, '\n')
+        logger.error('连接 Emby / Jellyfin 服务器未知错误：' + host_url_persons + format_exc())
+        print('× 连接 Emby / Jellyfin 服务器未知错误：', host_url_persons, '\n')
         sys.exit()
     if rqs_emby.status_code == 401:
         logger.error('Emby / Jellyfin 返回：401 API 未授权')
         print('× 无权访问 Emby / Jellyfin 服务器，请检查 API 密匙是否正确\n')
         sys.exit()
-    if rqs_emby.status_code == 404 and emby_flag:
-        logger.warning('Emby / Jellyfin 返回：404 API 未找到，尝试切换备选 API')
-        rewriteable_word('>> 可能是新版 Jellyfin，尝试重新连接...')
-        return read_persons(host_url, api_key, False)
-    elif rqs_emby.status_code == 404 and not emby_flag:
+    elif rqs_emby.status_code == 404:
         logger.error('Emby / Jellyfin 返回 404 API 未找到，且备选 API 亦无效')
-        print('× 尝试读取 Emby / Jellyfin 演员列表但是未找到，可能是未适配的版本：', host_url, '\n')
+        print('× 尝试读取 Emby / Jellyfin 演员列表但是未找到，可能是未适配的版本：', host_url_persons, '\n')
         sys.exit()
-    if rqs_emby.status_code != 200:
+    elif rqs_emby.status_code != 200:
         logger.error('Emby / Jellyfin 返回：' + str(rqs_emby.status_code))
         print('× 连接 Emby / Jellyfin 服务器成功，但是服务器内部错误：' + str(rqs_emby.status_code))
         sys.exit()
@@ -571,7 +578,7 @@ def read_persons(host_url, api_key, emby_flag):
         logger.info('连接 Emby / Jellyfin 服务器成功，包含演员：' + str(len(output)))
         print('√ 连接 Emby / Jellyfin 服务器成功')
         print('   演职人员：' + str(len(output)) + '人\n')
-        return output, emby_flag
+        return output
     except:
         logger.error('Emby / Jellyfin 的响应无法解析为 Json：' + rqs_emby.headers['Content-Type'])
         print('× 连接 Emby / Jellyfin 服务器成功，但是服务器的演员列表不能识别：' + rqs_emby.headers['Content-Type'])
@@ -589,8 +596,8 @@ def rewriteable_word(word):
 
 
 def del_all():
-    print('【调试模式】删除所有头像\n')
-    (list_persons, emby_flag) = read_persons(host_url, api_key, True)
+    print('【调试模式】删除所有头像及信息\n')
+    list_persons = read_persons(host_url, api_key)
     rewriteable_word('按任意键开始...')
     os.system('pause>nul') if WINOS else input('Press Enter to start...')
     with alive_bar(len(list_persons), enrich_print=False, dual_line=True) as bar:
@@ -598,13 +605,7 @@ def del_all():
             bar.text('正在删除：' + dic_each_actor['Name'])
             bar()
             if dic_each_actor['ImageTags']:
-                if emby_flag:
-                    url_post_img = host_url + 'emby/Items/' + dic_each_actor[
-                        'Id'] + '/Images/Primary?api_key=' + api_key
-                else:
-                    url_post_img = host_url + 'jellyfin/Items/' + dic_each_actor[
-                        'Id'] + '/Images/Primary?api_key=' + api_key
-                del_avatar(url_post_img)
+                del_avatar(dic_each_actor['Id'])
                 while True:
                     if not threading.activeCount() > max_upload_connect + 1: break
     rewriteable_word('>> 即将完成')
@@ -622,7 +623,7 @@ def del_all():
 def get_ip():
     global public_ip
     try:
-        response = session.get('https://api.myip.la/cn?json', proxies=proxies)
+        response = session.get('https://api.myip.la/cn?json')
         ip_country_code = loads(response.text)['location']['country_code']
         ip_country_name = loads(response.text)['location']['country_name']
         ip_city = loads(response.text)['location']['province']
@@ -638,8 +639,7 @@ def check_update():
     rewriteable_word('>> 检查更新...')
     try:
         get_ip()
-        response = session.get('https://api.github.com/repos/gfriends/gfriends-inputer/releases', proxies=proxies,
-                               timeout=5)
+        response = session.get('https://api.github.com/repos/gfriends/gfriends-inputer/releases', timeout=5)
         response.encoding = 'utf-8'
         """
         if response.status_code != 200:
@@ -699,7 +699,7 @@ def check_update():
                                     bar(len(data))
                                     bar.text(
                                         '下载中：%.2fMB/%.2fMB' % (
-                                        float(got_size / 1024 / 1024), float(content_size / 1024 / 1024)))
+                                            float(got_size / 1024 / 1024), float(content_size / 1024 / 1024)))
 
                         print("update.zip 已下载成功，请解压后使用新版本。")
                         logger.info("更新包下载成功")
@@ -750,13 +750,13 @@ else:
         os.chdir(config_path)  # 切换工作目录
     logger.debug('修正运行目录：' + config_path + ':' + work_path)
 
-(config_file, quiet_flag, update_flag) = argparse_function(version)
+(config_file, quiet_flag, update_flag, debugflag) = argparse_function(version)
 # if quiet_flag:
 #   sys.stdout = open("./Getter/quiet.log", "w", buffering=1)
 (repository_url, host_url, api_key, overwrite, fixsize, max_retries, Proxy, aifix, debug, deleteall,
  download_path, local_path, max_download_connect, max_upload_connect, BD_AI_client, BD_VIP, Get_Intro,
- Conflict_Proc) = read_config(
-    config_file)
+ Conflict_Proc) = read_config(config_file)
+del debugflag, config_file
 
 # 根据配置修改日志记录器属性
 logger = logging.getLogger()
@@ -768,18 +768,33 @@ else:
     logger.setLevel(logging.INFO)
 
 # 初始化日志后再尝试引入CV2
-from Lib.cv2dnn import find_faces
-
-# 持久会话
-session = requests.Session()
-session.mount('http://', requests.adapters.HTTPAdapter(max_retries=max_retries))
-session.mount('https://', requests.adapters.HTTPAdapter(max_retries=max_retries))
+if fixsize == 3:
+    from Lib.cv2dnn import find_faces
 
 # 局部代理
 if Proxy:
-    proxies = {'http': Proxy, 'https': Proxy}
+    proxies = host_proxies = {'http': Proxy, 'https': Proxy}
+    # 根据 IP 判断内网服务器
+    if re.search(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", host_url):
+        ip = reduce(lambda x, y: (x << 8) + y,
+                    map(int, re.search(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", host_url)[0].split('.')))
+        net_a = reduce(lambda x, y: (x << 8) + y, map(int, '10.255.255.255'.split('.'))) >> 24
+        net_b = reduce(lambda x, y: (x << 8) + y, map(int, '172.31.255.255'.split('.'))) >> 20
+        net_c = reduce(lambda x, y: (x << 8) + y, map(int, '192.168.255.255'.split('.'))) >> 16
+        if ip >> 24 == net_a or ip >> 20 == net_b or ip >> 16 == net_c:
+            host_proxies = {'http': None, 'https': None}
+        del net_a, net_b, net_c, ip
+    elif 'localhost' in host_url:
+        host_proxies = {'http': None, 'https': None}
 else:
-    proxies = None
+    proxies = host_proxies = None
+
+# 持久会话
+session = requests.Session()
+session.mount('http://', requests.adapters.HTTPAdapter(max_retries=max_retries, pool_connections=100, pool_maxsize=100))
+session.mount('https://', requests.adapters.HTTPAdapter(max_retries=max_retries, pool_connections=100, pool_maxsize=100))
+session.headers = {"User-Agent": 'Gfriends_Inputer/' + version.replace('v', '')}
+session.proxies = proxies
 
 # 检查更新
 public_ip = None
@@ -821,11 +836,12 @@ else:
         print('已配置局部代理 ' + Proxy + '，但似乎无法连通，请检查其格式和可用性\n')
 
 try:
-    (list_persons, emby_flag) = read_persons(host_url, api_key, True)
+    list_persons = read_persons(host_url, api_key)
     # list_persons = [{'Name': '@YOU', 'ServerId': 'be208b8f79ed449aacf99a1a23530488', 'Id': '59932', 'Type': 'Person', 'ImageTags': {'Primary': '3ad658cbfb0173e14bb09d255e84d64a'}, 'BackdropImageTags': []}]
     gfriends_map = get_gfriends_map(repository_url)
     actor_log = open('./Getter/演员清单.txt', 'w', encoding="UTF-8", buffering=1)
-    actor_log.write('【演员清单】\n该清单仅供参考，下面可能还有导演、编剧、赞助商等其他人的名字，但是女友头像仓库只会收录日本女友。\n而已匹配到的头像则会根据个人配置，下载导入或会跳过\n\n')
+    actor_log.write(
+        '【演员清单】\n该清单仅供参考，下面可能还有导演、编剧、赞助商等其他人的名字，但是女友头像仓库只会收录日本女友。\n而已匹配到的头像则会根据个人配置，下载导入或会跳过\n\n')
 
     logger.info('引擎初始化')
     rewriteable_word('>> 引擎初始化...')
@@ -868,6 +884,7 @@ try:
         actor_dict[actor_name] = actor_id
     actor_log.close()
 
+    # 增量更新逻辑
     if overwrite == 2 and not Conflict_Proc:
         md5_host_url = md5(host_url.encode('UTF-8')).hexdigest()[14:-14]
         if os.path.exists('./Getter/down' + md5_host_url + '.log'):  # 有下载记录，则逐行读取记录
@@ -888,28 +905,18 @@ try:
 
         for index, actor_name in enumerate(list(link_dict)):  # 有删除字典的操作，不能直接遍历字典
             try:
-                if WINOS and not quiet_flag and index % 5 == 0:
-                    rewriteable_word('>> 引擎初始化... ' + str(index) + '/' + str(len(list(link_dict))))
+                # if WINOS and not quiet_flag and index % 5 == 0:
+                #    rewriteable_word('>> 引擎初始化... ' + str(index) + '/' + str(len(list(link_dict))))
                 proc_md5 = md5((actor_name + '+0').encode('UTF-8')).hexdigest()[13:-13]
                 if not proc_flag or (proc_flag and not proc_md5 in proc_list):
                     check_avatar(link_dict[actor_name], actor_name, proc_md5)  # 记录检查完成的操作放到子线程中，以防没下完中断的断点没记录到
                 else:
                     proc_log.write(proc_md5 + '\n')
-                while True:
-                    if threading.activeCount() > 10 * max_download_connect + 1:
-                        time.sleep(0.01)
-                    else:
-                        break
             except KeyboardInterrupt:
                 sys.exit()
             except:
-                logger.warning('网络连接异常，跳过检查：' + str(actor_name) + format_exc())
-                print('× 网络连接异常，跳过检查：' + str(actor_name) + '\n')
-                continue
-        for thr_status in threading.enumerate():  # 等待子线程运行结束
-            try:
-                thr_status.join()
-            except RuntimeError:
+                logger.warning('跳过检查：' + str(actor_name) + format_exc())
+                print('× 跳过检查：' + str(actor_name) + '\n')
                 continue
     if proc_flag:
         print('√ 引擎初始化成功，尝试从上次中断位置继续')
@@ -928,7 +935,8 @@ try:
             for actor_name, link in link_dict.items():
                 try:
                     if Conflict_Proc == 1 and not quiet_flag:
-                        bar.text('正在下载：' + re.sub(r'（.*）', '', actor_name) + ' [' + str(len(link)) + '枚]') if '（' in actor_name else bar.text(
+                        bar.text('正在下载：' + re.sub(r'（.*）', '', actor_name) + ' [' + str(
+                            len(link)) + '枚]') if '（' in actor_name else bar.text(
                             '正在下载：' + actor_name + ' [' + str(len(link)) + '枚]')
                     else:
                         bar.text('正在下载：' + re.sub(r'（.*）', '', actor_name)) if '（' in actor_name else bar.text(
@@ -950,7 +958,7 @@ try:
                     with bar.pause():
                         logger.warning('网络连接异常，下载失败：' + str(actor_name) + format_exc())
                         print('× 网络连接异常且重试 ' + str(max_retries) + ' 次失败')
-                        print('× 请尝试开启全局代理或配置 HTTP 局部代理；若已开启代理，请检查其可用性')
+                        print('× 请尝试开启全局代理或配置局部代理；若已开启代理，请检查其可用性')
                         print('× 按任意键继续运行则跳过下载这些头像：' + str(actor_name) + '\n')
                         os.system('pause>nul') if WINOS else input()
                     continue
@@ -978,7 +986,7 @@ try:
         temp_list = []
         for filename in reversed(files):
             actorname = filename.replace('.jpg', '')
-            actorname = re.sub(r'\-\d+', '', actorname)
+            actorname = re.sub(r'-\d+', '', actorname)
             if '.jpg' in filename and actorname in actor_dict and actorname not in temp_list:
                 pic_path_dict[filename] = os.path.join(download_path, filename)
                 temp_list.append(actorname)
@@ -1012,78 +1020,69 @@ try:
                     pic_path_dict[filename] = file_path
     logger.info('本地头像目录构建完成')
 
-    if not pic_path_dict:
-        proc_log.close()
-        os.remove('./Getter/proc.tmp')
-        if overwrite == 2 and not Conflict_Proc:
-            down_log = open('./Getter/down' + md5_host_url + '.log', 'w', encoding="UTF-8")
-            down_log.write(
-                '## Gfriends Inputer 导入记录 ##\n## 请注意：删除本文件会导致服务器 ' + host_url + ' 的增量更新功能重置\n' + md5_config + '\n')
-            for key, value in inputed_dict.items():
-                down_log.write(key + '|' + value + '\n')
-            down_log.close()
-        print('\n√ 没有需要导入的头像')
-        logger.info('没有需要导入的头像')
-        if WINOS and not quiet_flag: print('\n按任意键退出程序...'); os.system('pause>nul')
-        os._exit(0)
+    if pic_path_dict:
+        if fixsize:
+            print('\n>> 尺寸优化...')
+            logger.info('开始优化头像尺寸')
+            with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
+                for filename, pic_path in pic_path_dict.items():
+                    bar.text(
+                        '正在优化：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
+                        '正在优化：' +
+                        filename.replace('.jpg', ''))
+                    bar()
+                    proc_md5 = md5((filename + '+2').encode('UTF-8')).hexdigest()[13:-13]
+                    if not proc_flag or (proc_flag and not proc_md5 in proc_list):
+                        result = fix_size(fixsize, pic_path)
+                        if not result: pic_path_dict.pop(filename)
+                    proc_log.write(proc_md5 + '\n')
+            print('√ 优化完成  ')
+            logger.info('尺寸优化完成')
+        else:
+            logger.info('未开启头像尺寸优化')
 
-    if fixsize:
-        print('\n>> 尺寸优化...')
-        logger.info('开始优化头像尺寸')
+        print('\n>> 导入头像...')
+        logger.info('导入头像')
         with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
             for filename, pic_path in pic_path_dict.items():
-                bar.text('正在优化：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
-                    '正在优化：' +
-                    filename.replace('.jpg', ''))
+                actorname = filename.replace('.jpg', '')
+                actorname = re.sub(r'1-\d+', '', actorname)
+                bar.text('正在导入：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
+                    '正在导入：' + actorname)
                 bar()
-                proc_md5 = md5((filename + '+2').encode('UTF-8')).hexdigest()[13:-13]
+                proc_md5 = md5((filename + '+3').encode('UTF-8')).hexdigest()[13:-13]
                 if not proc_flag or (proc_flag and not proc_md5 in proc_list):
-                    result = fix_size(fixsize, pic_path)
-                    if not result: pic_path_dict.pop(filename)
+                    with open(pic_path, 'rb') as pic_bit:
+                        b6_pic = b64encode(pic_bit.read())
+                    url_post_img = host_url + 'Items/' + actor_dict[actorname] + '/Images/Primary?api_key=' + api_key
+                    input_avatar(url_post_img, b6_pic)
+                    if Get_Intro == 1:
+                        bar.text(
+                            '搜索信息：' + re.sub(r'（.*）', '', filename).replace('.jpg',
+                                                                                '')) if '（' in filename else bar.text(
+                            '搜索信息：' + actorname)
+                        xslist_search(actor_dict[actorname], actorname)
                 proc_log.write(proc_md5 + '\n')
-        print('√ 优化完成  ')
-        logger.info('尺寸优化完成')
-    else:
-        logger.info('未开启头像尺寸优化')
-
-    print('\n>> 导入头像...')
-    logger.info('导入头像')
-    with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
-        for filename, pic_path in pic_path_dict.items():
-            actorname = filename.replace('.jpg', '')
-            actorname = re.sub(r'1\-\d+', '', actorname)
-            bar.text('正在导入：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
-                '正在导入：' + actorname)
-            bar()
-            proc_md5 = md5((filename + '+3').encode('UTF-8')).hexdigest()[13:-13]
-            if not proc_flag or (proc_flag and not proc_md5 in proc_list):
-                with open(pic_path, 'rb') as pic_bit:
-                    b6_pic = b64encode(pic_bit.read())
-                if emby_flag:
-                    url_post_img = host_url + 'emby/Items/' + actor_dict[
-                        actorname] + '/Images/Primary?api_key=' + api_key
-                else:
-                    url_post_img = host_url + 'jellyfin/Items/' + actor_dict[
-                        actorname] + '/Images/Primary?api_key=' + api_key
-                input_avatar(url_post_img, b6_pic)
-                if Get_Intro == 1:
-                    bar.text(
-                        '搜索信息：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
-                        '搜索信息：' + actorname)
-                    xslist_search(actor_dict[actorname], actorname)
-            proc_log.write(proc_md5 + '\n')
-            while True:
-                if threading.activeCount() > max_upload_connect + 1:
-                    time.sleep(0.01)
-                else:
-                    break
-            num_suc += 1
-    rewriteable_word('>> 即将完成')
-    for thr_status in threading.enumerate():  # 等待子线程运行结束
-        try:
-            thr_status.join()
-        except RuntimeError:
-            continue
+                while True:
+                    if threading.activeCount() > max_upload_connect + 1:
+                        time.sleep(0.01)
+                    else:
+                        break
+                num_suc += 1
+        rewriteable_word('>> 即将完成')
+        for thr_status in threading.enumerate():  # 等待子线程运行结束
+            try:
+                thr_status.join()
+            except RuntimeError:
+                continue
+        print('√ 导入完成  ')
+        print('\nEmby / Jellyfin 演职人员共 ' + str(len(list_persons)) + ' 人，其中 ' + str(num_exist) + ' 人之前已有头像')
+        print('本次导入/更新头像 ' + str(num_suc) + ' 枚，还有 ' + str(num_fail) + ' 人没有头像\n')
+        logger.info(
+            '导入头像完成，成功/失败/存在/总数：' + str(num_suc) + '/' + str(num_fail) + '/' + str(num_exist) + '/' + str(
+                len(list_persons)))
+        if not overwrite:
+            print('-- 未开启覆盖已有头像，所以跳过了一些演员，详见 Getter 目录下的记录清单')
     proc_log.close()
     os.remove('./Getter/proc.tmp')
     if overwrite == 2 and not Conflict_Proc:
@@ -1093,22 +1092,19 @@ try:
         for key, value in inputed_dict.items():
             down_log.write(key + '|' + value + '\n')
         down_log.close()
-    print('√ 导入完成  ')
-    print('\nEmby / Jellyfin 演职人员共 ' + str(len(list_persons)) + ' 人，其中 ' + str(num_exist) + ' 人之前已有头像')
-    print('本次导入/更新头像 ' + str(num_suc) + ' 枚，还有 ' + str(num_fail) + ' 人没有头像\n')
-    logger.info('导入头像完成，成功/失败/存在/总数：' + str(num_suc) + str(num_fail) + str(num_exist) + str(len(list_persons)))
-    if not overwrite:
-        print('-- 未开启覆盖已有头像，所以跳过了一些演员，详见 Getter 目录下的记录清单')
+    else:
+        print('\n√ 没有需要导入的头像')
+        logger.info('没有需要导入的头像')
 except KeyboardInterrupt:
     logger.info('用户强制停止')
     print('× 用户强制停止')
 except SystemExit:
-    logger.error('已知错误异常退出')
+    logger.error('已知错误')
     print('× 已知错误，请查阅 Getter 目录的 logger.log 日志文件。')
 except:
-    logger.error('未知错误异常退出：' + format_exc())
+    logger.error('未知错误：' + format_exc())
     print('× 未知错误，请查阅 Getter 目录的 logger.log 日志文件。')
 if WINOS and not quiet_flag:
     print('按任意键退出程序...')
     os.system('pause>nul')
-logger.info('正常退出')
+logger.info('退出程序')
