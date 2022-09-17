@@ -18,14 +18,14 @@ try:
         opencv_dnn_model = cv2.dnn.readNetFromTensorflow(pb_path, pbtxt_path)
         logger.info('OpenCV 初始化成功')
     else:
-        logger.warning('OpenCV 初始化失败：Lib库文件缺失。')
-        print('OpenCV 初始化失败：Lib库文件缺失。')
+        logger.warning('OpenCV 初始化失败：Lib 库文件缺失。')
+        print('OpenCV 初始化失败：Lib 库文件缺失。')
         print('建议重新下载程序，强制运行可能引发异常。')
         input('Press Enter to continue...')
 except cv2.error:
     logger.warning('OpenCV 初始化失败：' + format_exc().replace('\n', ''))
-    print('OpenCV 初始化失败，有可能是CPU或系统不兼容。')
-    print('建议重新下载程序或关闭本地AI功能，强制运行可能引发异常。')
+    print('OpenCV 初始化失败，有可能是 CPU 或系统不兼容。')
+    print('建议重新下载程序或关闭本地 AI 功能，强制运行可能引发异常。')
     input('Press Enter to continue...')
 
 
@@ -78,7 +78,7 @@ def find_faces(img):
     # cv2.imshow('Result', img)
 
 
-# test code
+# Testing code
 '''
 for filename in os.listdir("./Downloads"):
     if 'jpg' in filename:
