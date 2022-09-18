@@ -405,38 +405,6 @@ def read_config(config_file):
             debug = True if config_settings.get("调试功能", "DeBug") == '是' or debugflag else False
             deleteall = True if config_settings.get("调试功能", "DEL_ALL") == '是' else False
             fixsize = config_settings.getint("导入设置", "Size_Fix")
-            '''
-            # 弃用代理选项
-            if Proxy_Range not in ['ALL', 'REPO', 'HOST', 'NO']:
-                print('!! 局部代理范围 Proxy_Range 填写错误，自动关闭局部代理')
-                Proxy_Range = 'NO'
-                time.sleep(3)
-            if '127.0.0.1' in host_url or 'localhost' in host_url or '192.168' in host_url:
-                if Proxy_Range == 'ALL':
-                    print('>> 媒体服务器位于局域网或本地，自动仅代理女友仓库')
-                    Proxy_Range = 'REPO'
-                if Proxy_Range == 'HOST':
-                    print('>> 媒体服务器位于局域网或本地，自动关闭局部代理')
-                    Proxy_Range = 'NO'
-                time.sleep(1)
-            
-            # 修正旧版覆盖选项
-            if overwrite == '是' or overwrite == '否':
-                with open("config.ini", encoding = 'UTF-8-SIG') as file:
-                    content = file.read()
-                if '### 覆盖已有头像 ###' in content:
-                    print('!! 发现旧版本的配置文件。\n   自动将 “头像导入方式” 选项升级为 2 - 增量更新（头像有更新时覆盖） ', end = '')
-                    time.sleep(5)
-                    content = re.sub(r'OverWrite.*\n','OverWrite = 2\n',content,re.M)
-                    content = content.replace('### 覆盖已有头像 ###','### 头像导入方式 ###\n# 0 - 不覆盖\n# 1 - 全部覆盖\n# 2 - 头像有更新时覆盖')
-                    os.remove("config.ini")
-                    write_txt("config.ini", '### Gfriends Inputer 配置文件 ###\n\n' + content + '\n\n### 配置文件版本号，请勿修改 ###\nVersion = '+ version)
-                    overwrite == '2'
-                    print('ok')
-                else:
-                    print('!! 发现旧版本的配置文件，且无法自动升级。\n')
-                    sys.exit()
-            '''
             # 修正用户的URL
             if not host_url.endswith('/'): host_url += '/'
             if not repository_url.endswith('/'): repository_url += '/'
