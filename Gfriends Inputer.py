@@ -116,9 +116,9 @@ def xslist_search(id, name):
         # 重组请求json
         detial_json = {'Name': name,
                        'ProviderIds': 'Gfriends ' + detial_url,
-                       'Taglines': ['日本AV女优'],
+                       'Taglines': ['AV女优'],
                        'Genres': [],
-                       'Tags': ['日本AV女优'],
+                       'Tags': ['AV女优'],
                        'Overview': detial_info}
 
         url_post = host_url + 'Items/' + id + '?api_key=' + api_key
@@ -302,17 +302,48 @@ def input_avatar(url, data):
 
 
 @asyncc
-def del_avatar(id):
+def del_avatar(id, name):
     url_post_img = host_url + 'Items/' + id + '/Images/Primary?api_key=' + api_key
     session.delete(url=url_post_img, proxies=host_proxies)
     url_post_img = host_url + 'Items/' + id + '/Images/Backdrop?api_key=' + api_key
     session.delete(url=url_post_img, proxies=host_proxies)
+    url_post_img = host_url + 'Items/' + id + '/Images/Thumb?api_key=' + api_key
+    session.delete(url=url_post_img, proxies=host_proxies)
     # 重组请求json
-    detial_json = {'ProviderIds': '',
-                   'Taglines': [''],
-                   'Genres': [''],
-                   'Tags': [''],
-                   'Overview': ''}
+    detial_json = {
+        "Name": name,
+        "ForcedSortName": name,
+        "SortName": name,
+        "ChannelNumber": "",
+        "OriginalTitle": "",
+        "CommunityRating": "",
+        "CriticRating": "",
+        "IndexNumber": "0",
+        "ParentIndexNumber": "0",
+        "SortParentIndexNumber": "",
+        "SortIndexNumber": "",
+        "DisplayOrder": "",
+        "Album": "",
+        "AlbumArtists": [],
+        "ArtistItems": [],
+        "Overview": "",
+        "Status": "",
+        "Genres": [],
+        "Tags": [],
+        "TagItems": [],
+        "Studios": [],
+        "DateCreated": "",
+        "EndDate": "",
+        "ProductionYear": "",
+        "Video3DFormat": "",
+        "OfficialRating": "",
+        "CustomRating": "",
+        "ProviderIds": {},
+        "PreferredMetadataLanguage": "",
+        "PreferredMetadataCountryCode": "",
+        "ProductionLocations": [],
+        "Taglines": []
+    }
     url_post = host_url + 'Items/' + id + '?api_key=' + api_key
     session.post(url_post, json=detial_json, proxies=host_proxies)
 
@@ -604,10 +635,9 @@ def del_all():
         for dic_each_actor in list_persons:
             bar.text('正在删除：' + dic_each_actor['Name'])
             bar()
-            if dic_each_actor['ImageTags']:
-                del_avatar(dic_each_actor['Id'])
-                while True:
-                    if not threading.activeCount() > max_upload_connect + 1: break
+            del_avatar(dic_each_actor['Id'], dic_each_actor['Name'])
+            while True:
+                if not threading.activeCount() > max_upload_connect + 1: break
     rewriteable_word('>> 即将完成')
     for thr_status in threading.enumerate():
         try:
@@ -792,7 +822,8 @@ else:
 # 持久会话
 session = requests.Session()
 session.mount('http://', requests.adapters.HTTPAdapter(max_retries=max_retries, pool_connections=100, pool_maxsize=100))
-session.mount('https://', requests.adapters.HTTPAdapter(max_retries=max_retries, pool_connections=100, pool_maxsize=100))
+session.mount('https://',
+              requests.adapters.HTTPAdapter(max_retries=max_retries, pool_connections=100, pool_maxsize=100))
 session.headers = {"User-Agent": 'Gfriends_Inputer/' + version.replace('v', '')}
 session.proxies = proxies
 
@@ -1027,7 +1058,8 @@ try:
             with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
                 for filename, pic_path in pic_path_dict.items():
                     bar.text(
-                        '正在优化：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
+                        '正在优化：' + re.sub(r'（.*）', '', filename).replace('.jpg',
+                                                                            '')) if '（' in filename else bar.text(
                         '正在优化：' +
                         filename.replace('.jpg', ''))
                     bar()
@@ -1047,7 +1079,8 @@ try:
             for filename, pic_path in pic_path_dict.items():
                 actorname = filename.replace('.jpg', '')
                 actorname = re.sub(r'1-\d+', '', actorname)
-                bar.text('正在导入：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
+                bar.text(
+                    '正在导入：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
                     '正在导入：' + actorname)
                 bar()
                 proc_md5 = md5((filename + '+3').encode('UTF-8')).hexdigest()[13:-13]
@@ -1076,7 +1109,8 @@ try:
             except RuntimeError:
                 continue
         print('√ 导入完成  ')
-        print('\nEmby / Jellyfin 演职人员共 ' + str(len(list_persons)) + ' 人，其中 ' + str(num_exist) + ' 人之前已有头像')
+        print(
+            '\nEmby / Jellyfin 演职人员共 ' + str(len(list_persons)) + ' 人，其中 ' + str(num_exist) + ' 人之前已有头像')
         print('本次导入/更新头像 ' + str(num_suc) + ' 枚，还有 ' + str(num_fail) + ' 人没有头像\n')
         logger.info(
             '导入头像完成，成功/失败/存在/总数：' + str(num_suc) + '/' + str(num_fail) + '/' + str(num_exist) + '/' + str(
