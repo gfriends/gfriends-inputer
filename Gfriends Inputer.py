@@ -83,6 +83,15 @@ def fix_size(type, path):
         return False
 
 
+def asyncc(f):
+    def wrapper(*args, **kwargs):
+        thr = threading.Thread(target=f, args=args, kwargs=kwargs)
+        thr.start()
+
+    return wrapper
+
+
+# @asyncc
 def xslist_search(id, name):
     try:
         # 搜索
@@ -100,30 +109,52 @@ def xslist_search(id, name):
         response = session.get(detial_url, timeout=10)
         html = etree.HTML(response.text)
         try:
-            detial_list = html.xpath('/html/body/div[1]/div[3]/div/p[1]/descendant-or-self::text()')
-            detial_info = ''
-            for info in detial_list:
-                info = info.replace(' ', '', 1)  # 删掉多余空格
+            detail_list = html.xpath('/html/body/div[1]/div[3]/div/p[1]/descendant-or-self::text()')
+            detail_dict = {}
+            for index, info in enumerate(detail_list):
+                info = info.replace(' ', '', 2)  # 删掉多余空格
                 if '身高' in info or '国籍' in info:
-                    detial_info += info
+                    if detail_list[index + 1].split(':')[0] != 'n/a':
+                        detail_dict[info.split(':')[0]] = detail_list[index + 1].split(':')[0]
                 else:
-                    detial_info += info + '<br>'
-            logger.debug(name + '已获取个人信息：' + detial_info)
+                    if len(info.split(':')) > 1 and info.split(':')[1] != 'n/a':
+                        detail_dict[info.split(':')[0]] = info.split(':')[1]
+            logger.debug(name + '已获取个人信息：' + str(detail_dict))
         except:
             logger.warning(name + '个人信息解析失败，页面：' + detial_url)
             return False
 
+        # 处理输出简介
+        detail_info = ''
+        cups = ProductionLocations = PremiereDate = ''
+        for item in detail_dict.items():
+            # 输出字段到对应位置
+            if item[0] == '罩杯':
+                cups = item[1]
+                pass
+            if item[0] == '国籍':
+                ProductionLocations = item[1]
+            elif item[0] == '出生':
+                PremiereDate = item[1].replace("年", "-").replace("月", "-").replace("日", "")
+            else:  # 其余字段作为简介内容
+                detail_info += item[0] + ': ' + item[1] + '<br>'
+
         # 重组请求json
-        detial_json = {'Name': name,
-                       'ProviderIds': 'Gfriends ' + detial_url,
-                       'Taglines': ['AV女优'],
-                       'Genres': [],
-                       'Tags': ['AV女优'],
-                       'Overview': detial_info}
+        detial_json = {"name": name, "Taglines": ['AV女优'], "Genres": [],
+                       "ProviderIds": {"Gfriends": "https://git.io/gfriends"},
+                       "Overview": detail_info}
+        if ProductionLocations:
+            detial_json["ProductionLocations"] = [ProductionLocations]
+        if PremiereDate:
+            detial_json["PremiereDate"] = PremiereDate
+        if cups:
+            detial_json["Tags"] = ['AV女优', cups]
+        else:
+            detial_json["Tags"] = ['AV女优']
 
         url_post = host_url + 'Items/' + id + '?api_key=' + api_key
-        session.post(url_post, json=detial_json, proxies=host_proxies)
-        logger.debug(name + '个人信息已上传')
+        response = session.post(url_post, json=detial_json, proxies=host_proxies)
+        logger.debug(name + '个人信息已上传，返回：' + response.text)
         return True
     except (KeyboardInterrupt, SystemExit):
         sys.exit()
@@ -221,14 +252,6 @@ def get_gfriends_map(repository_url):
     logger.info('文件树解析成功，库存头像：' + str(map_json['Information']['TotalNum']))
     print('   库存头像：' + str(map_json['Information']['TotalNum']) + '枚\n')
     return output
-
-
-def asyncc(f):
-    def wrapper(*args, **kwargs):
-        thr = threading.Thread(target=f, args=args, kwargs=kwargs)
-        thr.start()
-
-    return wrapper
 
 
 # @asyncc
@@ -521,9 +544,9 @@ BD_Secret_Key =
 
 [调试功能]
 ### 删除所有演员头像及演员元数据 ###
-# 支持删除的头像：Primary / Backdrop(通常由 MDCx 导入)
-# 支持删除的元数据：ProviderIds / Taglines / Genres / Tags / Overview
-# 删除操作不可逆
+# 支持删除的头像：Primary / Thumb / Backdrop(通常由 MDCx 导入)
+# 支持删除的元数据：ProviderIds / Taglines / Genres / Tags / Overview，锁定元数据的项目不会被删除。
+# 注意：删除操作不可逆！
 DEL_ALL = 否
 
 ### DEBUG 调试模式 ###
@@ -808,6 +831,8 @@ actor_dict = {}
 link_dict = {}
 inputed_dict = {}
 proc_flag = False
+if Get_Intro:
+    max_upload_connect /= 5
 
 print('Gfriends Inputer ' + version)
 print('https://git.io/gfriends\n')
