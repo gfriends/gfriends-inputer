@@ -2,8 +2,8 @@
 # Gfriends Inputer / 女友头像仓库导入工具
 # Licensed under the MIT license.
 # Designed by xinxin8816, many thanks for junerain123, ddd354, moyy996.
-version = 'v3.03'
-compatible_conf_version = ['v3.00', 'v3.01', 'v3.02', 'v3.03']
+version = 'v3.04'
+compatible_conf_version = ['v3.00', 'v3.01', 'v3.02', 'v3.03', 'v3.04']
 
 import requests, os, io, sys, time, re, threading, argparse, logging
 from alive_progress import alive_bar
@@ -83,6 +83,15 @@ def fix_size(type, path):
         return False
 
 
+def asyncc(f):
+    def wrapper(*args, **kwargs):
+        thr = threading.Thread(target=f, args=args, kwargs=kwargs)
+        thr.start()
+
+    return wrapper
+
+
+# @asyncc
 def xslist_search(id, name):
     try:
         # 搜索
@@ -100,30 +109,52 @@ def xslist_search(id, name):
         response = session.get(detial_url, timeout=10)
         html = etree.HTML(response.text)
         try:
-            detial_list = html.xpath('/html/body/div[1]/div[3]/div/p[1]/descendant-or-self::text()')
-            detial_info = ''
-            for info in detial_list:
-                info = info.replace(' ', '', 1)  # 删掉多余空格
+            detail_list = html.xpath('/html/body/div[1]/div[3]/div/p[1]/descendant-or-self::text()')
+            detail_dict = {}
+            for index, info in enumerate(detail_list):
+                info = info.replace(' ', '', 2)  # 删掉多余空格
                 if '身高' in info or '国籍' in info:
-                    detial_info += info
+                    if detail_list[index + 1].split(':')[0] != 'n/a':
+                        detail_dict[info.split(':')[0]] = detail_list[index + 1].split(':')[0]
                 else:
-                    detial_info += info + '<br>'
-            logger.debug(name + '已获取个人信息：' + detial_info)
+                    if len(info.split(':')) > 1 and info.split(':')[1] != 'n/a':
+                        detail_dict[info.split(':')[0]] = info.split(':')[1]
+            logger.debug(name + '已获取个人信息：' + str(detail_dict))
         except:
             logger.warning(name + '个人信息解析失败，页面：' + detial_url)
             return False
 
+        # 处理输出简介
+        detail_info = ''
+        cups = ProductionLocations = PremiereDate = ''
+        for item in detail_dict.items():
+            # 输出字段到对应位置
+            if item[0] == '罩杯':
+                cups = item[1]
+                pass
+            if item[0] == '国籍':
+                ProductionLocations = item[1]
+            elif item[0] == '出生':
+                PremiereDate = item[1].replace("年", "-").replace("月", "-").replace("日", "")
+            else:  # 其余字段作为简介内容
+                detail_info += item[0] + ': ' + item[1] + '<br>'
+
         # 重组请求json
-        detial_json = {'Name': name,
-                       'ProviderIds': 'Gfriends ' + detial_url,
-                       'Taglines': ['日本AV女优'],
-                       'Genres': [],
-                       'Tags': ['日本AV女优'],
-                       'Overview': detial_info}
+        detial_json = {"name": name, "Taglines": ['AV女优'], "Genres": [],
+                       "ProviderIds": {"Gfriends": "https://git.io/gfriends"},
+                       "Overview": detail_info}
+        if ProductionLocations:
+            detial_json["ProductionLocations"] = [ProductionLocations]
+        if PremiereDate:
+            detial_json["PremiereDate"] = PremiereDate
+        if cups:
+            detial_json["Tags"] = ['AV女优', cups]
+        else:
+            detial_json["Tags"] = ['AV女优']
 
         url_post = host_url + 'Items/' + id + '?api_key=' + api_key
-        session.post(url_post, json=detial_json, proxies=host_proxies)
-        logger.debug(name + '个人信息已上传')
+        response = session.post(url_post, json=detial_json, proxies=host_proxies)
+        logger.debug(name + '个人信息已上传，返回：' + response.text)
         return True
     except (KeyboardInterrupt, SystemExit):
         sys.exit()
@@ -223,14 +254,6 @@ def get_gfriends_map(repository_url):
     return output
 
 
-def asyncc(f):
-    def wrapper(*args, **kwargs):
-        thr = threading.Thread(target=f, args=args, kwargs=kwargs)
-        thr.start()
-
-    return wrapper
-
-
 # @asyncc
 def check_avatar(url, actor_name, proc_md5):
     try:
@@ -302,17 +325,48 @@ def input_avatar(url, data):
 
 
 @asyncc
-def del_avatar(id):
+def del_avatar(id, name):
     url_post_img = host_url + 'Items/' + id + '/Images/Primary?api_key=' + api_key
     session.delete(url=url_post_img, proxies=host_proxies)
     url_post_img = host_url + 'Items/' + id + '/Images/Backdrop?api_key=' + api_key
     session.delete(url=url_post_img, proxies=host_proxies)
+    url_post_img = host_url + 'Items/' + id + '/Images/Thumb?api_key=' + api_key
+    session.delete(url=url_post_img, proxies=host_proxies)
     # 重组请求json
-    detial_json = {'ProviderIds': '',
-                   'Taglines': [''],
-                   'Genres': [''],
-                   'Tags': [''],
-                   'Overview': ''}
+    detial_json = {
+        "Name": name,
+        "ForcedSortName": name,
+        "SortName": name,
+        "ChannelNumber": "",
+        "OriginalTitle": "",
+        "CommunityRating": "",
+        "CriticRating": "",
+        "IndexNumber": "0",
+        "ParentIndexNumber": "0",
+        "SortParentIndexNumber": "",
+        "SortIndexNumber": "",
+        "DisplayOrder": "",
+        "Album": "",
+        "AlbumArtists": [],
+        "ArtistItems": [],
+        "Overview": "",
+        "Status": "",
+        "Genres": [],
+        "Tags": [],
+        "TagItems": [],
+        "Studios": [],
+        "DateCreated": "",
+        "EndDate": "",
+        "ProductionYear": "",
+        "Video3DFormat": "",
+        "OfficialRating": "",
+        "CustomRating": "",
+        "ProviderIds": {},
+        "PreferredMetadataLanguage": "",
+        "PreferredMetadataCountryCode": "",
+        "ProductionLocations": [],
+        "Taglines": []
+    }
     url_post = host_url + 'Items/' + id + '?api_key=' + api_key
     session.post(url_post, json=detial_json, proxies=host_proxies)
 
@@ -374,38 +428,6 @@ def read_config(config_file):
             debug = True if config_settings.get("调试功能", "DeBug") == '是' or debugflag else False
             deleteall = True if config_settings.get("调试功能", "DEL_ALL") == '是' else False
             fixsize = config_settings.getint("导入设置", "Size_Fix")
-            '''
-            # 弃用代理选项
-            if Proxy_Range not in ['ALL', 'REPO', 'HOST', 'NO']:
-                print('!! 局部代理范围 Proxy_Range 填写错误，自动关闭局部代理')
-                Proxy_Range = 'NO'
-                time.sleep(3)
-            if '127.0.0.1' in host_url or 'localhost' in host_url or '192.168' in host_url:
-                if Proxy_Range == 'ALL':
-                    print('>> 媒体服务器位于局域网或本地，自动仅代理女友仓库')
-                    Proxy_Range = 'REPO'
-                if Proxy_Range == 'HOST':
-                    print('>> 媒体服务器位于局域网或本地，自动关闭局部代理')
-                    Proxy_Range = 'NO'
-                time.sleep(1)
-            
-            # 修正旧版覆盖选项
-            if overwrite == '是' or overwrite == '否':
-                with open("config.ini", encoding = 'UTF-8-SIG') as file:
-                    content = file.read()
-                if '### 覆盖已有头像 ###' in content:
-                    print('!! 发现旧版本的配置文件。\n   自动将 “头像导入方式” 选项升级为 2 - 增量更新（头像有更新时覆盖） ', end = '')
-                    time.sleep(5)
-                    content = re.sub(r'OverWrite.*\n','OverWrite = 2\n',content,re.M)
-                    content = content.replace('### 覆盖已有头像 ###','### 头像导入方式 ###\n# 0 - 不覆盖\n# 1 - 全部覆盖\n# 2 - 头像有更新时覆盖')
-                    os.remove("config.ini")
-                    write_txt("config.ini", '### Gfriends Inputer 配置文件 ###\n\n' + content + '\n\n### 配置文件版本号，请勿修改 ###\nVersion = '+ version)
-                    overwrite == '2'
-                    print('ok')
-                else:
-                    print('!! 发现旧版本的配置文件，且无法自动升级。\n')
-                    sys.exit()
-            '''
             # 修正用户的URL
             if not host_url.endswith('/'): host_url += '/'
             if not repository_url.endswith('/'): repository_url += '/'
@@ -522,9 +544,9 @@ BD_Secret_Key =
 
 [调试功能]
 ### 删除所有演员头像及演员元数据 ###
-# 支持删除的头像：Primary / Backdrop(通常由 MDCx 导入)
-# 支持删除的元数据：ProviderIds / Taglines / Genres / Tags / Overview
-# 删除操作不可逆
+# 支持删除的头像：Primary / Thumb / Backdrop(通常由 MDCx 导入)
+# 支持删除的元数据：ProviderIds / Taglines / Genres / Tags / Overview，锁定元数据的项目不会被删除。
+# 注意：删除操作不可逆！
 DEL_ALL = 否
 
 ### DEBUG 调试模式 ###
@@ -604,10 +626,9 @@ def del_all():
         for dic_each_actor in list_persons:
             bar.text('正在删除：' + dic_each_actor['Name'])
             bar()
-            if dic_each_actor['ImageTags']:
-                del_avatar(dic_each_actor['Id'])
-                while True:
-                    if not threading.activeCount() > max_upload_connect + 1: break
+            del_avatar(dic_each_actor['Id'], dic_each_actor['Name'])
+            while True:
+                if not threading.activeCount() > max_upload_connect + 1: break
     rewriteable_word('>> 即将完成')
     for thr_status in threading.enumerate():
         try:
@@ -792,7 +813,8 @@ else:
 # 持久会话
 session = requests.Session()
 session.mount('http://', requests.adapters.HTTPAdapter(max_retries=max_retries, pool_connections=100, pool_maxsize=100))
-session.mount('https://', requests.adapters.HTTPAdapter(max_retries=max_retries, pool_connections=100, pool_maxsize=100))
+session.mount('https://',
+              requests.adapters.HTTPAdapter(max_retries=max_retries, pool_connections=100, pool_maxsize=100))
 session.headers = {"User-Agent": 'Gfriends_Inputer/' + version.replace('v', '')}
 session.proxies = proxies
 
@@ -809,6 +831,8 @@ actor_dict = {}
 link_dict = {}
 inputed_dict = {}
 proc_flag = False
+if Get_Intro:
+    max_upload_connect /= 5
 
 print('Gfriends Inputer ' + version)
 print('https://git.io/gfriends\n')
@@ -1027,7 +1051,8 @@ try:
             with alive_bar(len(pic_path_dict), enrich_print=False, dual_line=True) as bar:
                 for filename, pic_path in pic_path_dict.items():
                     bar.text(
-                        '正在优化：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
+                        '正在优化：' + re.sub(r'（.*）', '', filename).replace('.jpg',
+                                                                            '')) if '（' in filename else bar.text(
                         '正在优化：' +
                         filename.replace('.jpg', ''))
                     bar()
@@ -1047,7 +1072,8 @@ try:
             for filename, pic_path in pic_path_dict.items():
                 actorname = filename.replace('.jpg', '')
                 actorname = re.sub(r'1-\d+', '', actorname)
-                bar.text('正在导入：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
+                bar.text(
+                    '正在导入：' + re.sub(r'（.*）', '', filename).replace('.jpg', '')) if '（' in filename else bar.text(
                     '正在导入：' + actorname)
                 bar()
                 proc_md5 = md5((filename + '+3').encode('UTF-8')).hexdigest()[13:-13]
@@ -1076,7 +1102,8 @@ try:
             except RuntimeError:
                 continue
         print('√ 导入完成  ')
-        print('\nEmby / Jellyfin 演职人员共 ' + str(len(list_persons)) + ' 人，其中 ' + str(num_exist) + ' 人之前已有头像')
+        print(
+            '\nEmby / Jellyfin 演职人员共 ' + str(len(list_persons)) + ' 人，其中 ' + str(num_exist) + ' 人之前已有头像')
         print('本次导入/更新头像 ' + str(num_suc) + ' 枚，还有 ' + str(num_fail) + ' 人没有头像\n')
         logger.info(
             '导入头像完成，成功/失败/存在/总数：' + str(num_suc) + '/' + str(num_fail) + '/' + str(num_exist) + '/' + str(
