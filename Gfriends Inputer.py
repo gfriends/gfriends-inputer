@@ -2,8 +2,8 @@
 # Gfriends Inputer / 女友头像仓库导入工具
 # Licensed under the MIT license.
 # Designed by xinxin8816, many thanks for junerain123, ddd354, moyy996.
-version = 'v3.03'
-compatible_conf_version = ['v3.00', 'v3.01', 'v3.02', 'v3.03']
+version = 'v3.04'
+compatible_conf_version = ['v3.00', 'v3.01', 'v3.02', 'v3.03', 'v3.04']
 
 import requests, os, io, sys, time, re, threading, argparse, logging
 from alive_progress import alive_bar
