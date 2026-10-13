@@ -152,8 +152,8 @@ def xslist_search(id, name):
         else:
             detial_json["Tags"] = ['AV女优']
 
-        url_post = host_url + 'Items/' + id + '?api_key=' + api_key
-        response = session.post(url_post, json=detial_json, proxies=host_proxies)
+        url_post = host_url + 'Items/' + id
+        response = session.post(url_post, json=detial_json, headers=host_headers(), proxies=host_proxies)
         logger.debug(name + '个人信息已上传，返回：' + response.text)
         return True
     except (KeyboardInterrupt, SystemExit):
@@ -316,7 +316,7 @@ def download_avatar(url, actor_name, proc_md5):
 @asyncc
 def input_avatar(url, data):
     try:
-        session.post(url, proxies=host_proxies, data=data, headers={"Content-Type": 'image/jpeg'})
+        session.post(url, proxies=host_proxies, data=data, headers=host_headers({"Content-Type": 'image/jpeg'}))
         logger.debug(url.replace(host_url, '').replace(api_key, '***') + ' 导入成功。')
     except:
         logger.warning(url.replace(host_url, '').replace(api_key, '***') + ' 导入失败。' + format_exc())
@@ -326,12 +326,12 @@ def input_avatar(url, data):
 
 @asyncc
 def del_avatar(id, name):
-    url_post_img = host_url + 'Items/' + id + '/Images/Primary?api_key=' + api_key
-    session.delete(url=url_post_img, proxies=host_proxies)
-    url_post_img = host_url + 'Items/' + id + '/Images/Backdrop?api_key=' + api_key
-    session.delete(url=url_post_img, proxies=host_proxies)
-    url_post_img = host_url + 'Items/' + id + '/Images/Thumb?api_key=' + api_key
-    session.delete(url=url_post_img, proxies=host_proxies)
+    url_post_img = host_url + 'Items/' + id + '/Images/Primary'
+    session.delete(url=url_post_img, headers=host_headers(), proxies=host_proxies)
+    url_post_img = host_url + 'Items/' + id + '/Images/Backdrop'
+    session.delete(url=url_post_img, headers=host_headers(), proxies=host_proxies)
+    url_post_img = host_url + 'Items/' + id + '/Images/Thumb'
+    session.delete(url=url_post_img, headers=host_headers(), proxies=host_proxies)
     # 重组请求json
     detial_json = {
         "Name": name,
@@ -367,8 +367,8 @@ def del_avatar(id, name):
         "ProductionLocations": [],
         "Taglines": []
     }
-    url_post = host_url + 'Items/' + id + '?api_key=' + api_key
-    session.post(url_post, json=detial_json, proxies=host_proxies)
+    url_post = host_url + 'Items/' + id
+    session.post(url_post, json=detial_json, headers=host_headers(), proxies=host_proxies)
 
 
 def get_gfriends_link(name):
@@ -563,11 +563,20 @@ Version = '''
         sys.exit()
 
 
+def host_headers(extra=None):
+    # Jellyfin 12 默认关闭旧鉴权（?api_key= 查询串 / X-Emby-Token 头会被 401/400 拒绝）。
+    # Authorization: MediaBrowser Token="..." 在 Jellyfin 10.x / 12 与 Emby 上均通用，且不受
+    # ServerConfiguration.EnableLegacyAuthorization 开关影响。
+    h = {"Authorization": 'MediaBrowser Token="' + api_key + '"'}
+    if extra: h.update(extra)
+    return h
+
+
 def read_persons(host_url, api_key):
     rewriteable_word('>> 连接 Emby / Jellyfin 服务器...')
-    host_url_persons = host_url + 'Persons?api_key=' + api_key  # &PersonTypes=Actor
+    host_url_persons = host_url + 'Persons'  # &PersonTypes=Actor
     try:
-        rqs_emby = session.get(url=host_url_persons, proxies=host_proxies, timeout=60, verify=False)
+        rqs_emby = session.get(url=host_url_persons, headers=host_headers(), proxies=host_proxies, timeout=60, verify=False)
     except requests.exceptions.ConnectionError:
         logger.error('连接 Emby / Jellyfin 服务器失败：' + host_url_persons + format_exc())
         print('× 连接 Emby / Jellyfin 服务器失败，请检查地址是否正确：', host_url_persons, '\n')
@@ -1080,7 +1089,7 @@ try:
                 if not proc_flag or (proc_flag and not proc_md5 in proc_list):
                     with open(pic_path, 'rb') as pic_bit:
                         b6_pic = b64encode(pic_bit.read())
-                    url_post_img = host_url + 'Items/' + actor_dict[actorname] + '/Images/Primary?api_key=' + api_key
+                    url_post_img = host_url + 'Items/' + actor_dict[actorname] + '/Images/Primary'
                     input_avatar(url_post_img, b6_pic)
                     if Get_Intro == 1:
                         bar.text(

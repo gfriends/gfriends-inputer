@@ -9,6 +9,7 @@ on:
     paths:
     - '**.py'
     - '**.yml'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -18,12 +19,12 @@ jobs:
         os: [macos-latest, windows-latest, ubuntu-latest]
 
     steps:
-    - uses: actions/checkout@v2
-    
+    - uses: actions/checkout@v4
+
     - name: Set Up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
-        python-version: 3.9
+        python-version: '3.9'
 
     - name: Install dependencies & Copy library
       run: |
@@ -39,7 +40,7 @@ jobs:
           pyinstaller -F 'Gfriends Inputer.py' --collect-all grapheme
 
     - name: Upload Build Artifact
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v4
       with:
-        name: Gfriends-Inputer-${{ runner.os }}
+        name: Gfriends-Inputer-${{ matrix.os }}
         path: dist
